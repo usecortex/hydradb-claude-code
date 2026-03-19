@@ -136,6 +136,8 @@ export HYDRADB_INGESTION_MODE="memory"
 export HYDRADB_AUTO_RECALL="true"
 export HYDRADB_AUTO_INGEST="true"
 export HYDRADB_MAX_CONTEXT_CHARS="7000"
+export HYDRADB_REQUEST_TIMEOUT_MS="15000"
+export HYDRADB_WRITE_TIMEOUT_MS="30000"
 ```
 
 See [config.example.json](./config.example.json) for the full shape and [.hydradb-plugin.json.example](./.hydradb-plugin.json.example) for a workspace-scoped starting point.
@@ -158,6 +160,8 @@ See [config.example.json](./config.example.json) for the full shape and [.hydrad
   "maxContextChars": 7000,
   "maxMemoryResults": 6,
   "maxKnowledgeResults": 4,
+  "requestTimeoutMs": 15000,
+  "writeTimeoutMs": 30000,
   "maxFileSizeBytes": 250000,
   "maxFilesPerSync": 25,
   "maxMemoryCharsPerChunk": 12000,
@@ -174,6 +178,7 @@ See [config.example.json](./config.example.json) for the full shape and [.hydrad
 - redacts high-confidence secrets before sync, recall injection, and memory capture
 - treats recalled HydraDB content as supporting context, not new instructions
 - supports an opt-out marker, `hydra-ignore`, for prompts and files
+- bounds HydraDB network wait time with configurable read and write timeouts
 
 See [docs/security.md](./docs/security.md) for the fuller bug/security note, remaining limits, and recommended safer defaults.
 

@@ -1,6 +1,8 @@
 import { redactSecrets } from "./sanitize.mjs";
 
 const DEFAULT_API_BASE = "https://api.hydradb.com";
+const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
+const DEFAULT_WRITE_TIMEOUT_MS = 30000;
 
 export const DEFAULT_MEMORY_CAPTURE_INSTRUCTIONS =
   "Extract durable user preferences, working style, project decisions, recurring constraints, " +
@@ -354,23 +356,42 @@ function normalizeResponse(response) {
 }
 
 export class HydraClient {
-  constructor({ apiKey, tenantId, subTenantId, baseUrl = DEFAULT_API_BASE }) {
+  constructor({
+    apiKey,
+    tenantId,
+    subTenantId,
+    baseUrl = DEFAULT_API_BASE,
+    requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+    writeTimeoutMs = DEFAULT_WRITE_TIMEOUT_MS
+  }) {
     this.apiKey = apiKey;
     this.tenantId = tenantId;
     this.subTenantId = subTenantId;
     this.baseUrl = baseUrl.replace(/\/+$/g, "");
+    this.requestTimeoutMs = requestTimeoutMs;
+    this.writeTimeoutMs = writeTimeoutMs;
   }
 
   async request(path, body, options = {}) {
-    const response = await fetch(`${this.baseUrl}${path}`, {
-      method: options.method || "POST",
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: body == null ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(options.timeoutMs ?? 15000)
-    });
+    const timeoutMs = options.timeoutMs ?? this.requestTimeoutMs;
+    let response;
+
+    try {
+      response = await fetch(`${this.baseUrl}${path}`, {
+        method: options.method || "POST",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: body == null ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(timeoutMs)
+      });
+    } catch (error) {
+      if (error?.name === "TimeoutError" || error?.name === "AbortError") {
+        throw new Error(`${path} timed out after ${timeoutMs}ms`);
+      }
+      throw error;
+    }
 
     if (!response.ok) {
       const text = trimText(await response.text().catch(() => ""));
@@ -396,7 +417,11 @@ export class HydraClient {
       graph_context: options.graphContext ?? true
     };
 
-    return normalizeResponse(await this.request("/recall/recall_preferences", payload));
+    return normalizeResponse(
+      await this.request("/recall/recall_preferences", payload, {
+        timeoutMs: options.timeoutMs ?? this.requestTimeoutMs
+      })
+    );
   }
 
   async recallKnowledge(query, options = {}) {
@@ -411,7 +436,11 @@ export class HydraClient {
       graph_context: options.graphContext ?? true
     };
 
-    return normalizeResponse(await this.request("/recall/full_recall", payload));
+    return normalizeResponse(
+      await this.request("/recall/full_recall", payload, {
+        timeoutMs: options.timeoutMs ?? this.requestTimeoutMs
+      })
+    );
   }
 
   async addMemories(memories, options = {}) {
@@ -422,7 +451,9 @@ export class HydraClient {
       upsert: options.upsert ?? true
     };
 
-    return this.request("/memories/add_memory", payload, { timeoutMs: options.timeoutMs ?? 30000 });
+    return this.request("/memories/add_memory", payload, {
+      timeoutMs: options.timeoutMs ?? this.writeTimeoutMs
+    });
   }
 
   async addTextMemory(text, options = {}) {
@@ -470,7 +501,9 @@ export class HydraClient {
       app_knowledge: appKnowledge
     };
 
-    return this.request("/ingestion/upload_knowledge", payload, { timeoutMs: 30000 });
+    return this.request("/ingestion/upload_knowledge", payload, {
+      timeoutMs: this.writeTimeoutMs
+    });
   }
 }
 

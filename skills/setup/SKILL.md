@@ -36,6 +36,8 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/plugin.mjs" status --json
   "recallMode": "thinking",
   "graphContext": true,
   "maxContextChars": 7000,
+  "requestTimeoutMs": 15000,
+  "writeTimeoutMs": 30000,
   "ignoreMarker": "hydra-ignore"
 }
 ```
@@ -62,3 +64,5 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/plugin.mjs" status
 10. If the user wants whole-session upsert behavior, set `captureMode` to `session-upsert`. If they want both isolated turns and rolling session memories, set it to `both`.
 
 11. The default workspace sync target should usually be `ingestionMode: "memory"`, with markdown-first `includeGlobs`. Only recommend `knowledge` or `both` recall if the user understands the tradeoff.
+
+12. If HydraDB feels slow or the user wants tighter hook budgets, suggest lowering `requestTimeoutMs` and `writeTimeoutMs`, or setting `HYDRADB_REQUEST_TIMEOUT_MS` and `HYDRADB_WRITE_TIMEOUT_MS`.

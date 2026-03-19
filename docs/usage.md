@@ -18,7 +18,9 @@ Then add a workspace config if you want repo-specific behavior:
   "subTenantId": "claude-my-workspace",
   "captureMode": "turn",
   "searchMode": "memory",
-  "ingestionMode": "memory"
+  "ingestionMode": "memory",
+  "requestTimeoutMs": 15000,
+  "writeTimeoutMs": 30000
 }
 ```
 
@@ -110,7 +112,26 @@ Use this when you want automatic recall and sync, but no automatic memory writes
 
 If you use `ingestionMode: "auto"`, pair it with `searchMode: "both"` so auto recall can see both storage paths.
 
-## 4. What gets synced from the workspace
+## 4. Network timeout controls
+
+- `requestTimeoutMs`: timeout for recall and other read-style HydraDB requests
+- `writeTimeoutMs`: timeout for memory ingestion and workspace sync uploads
+
+Example:
+
+```json
+{
+  "requestTimeoutMs": 10000,
+  "writeTimeoutMs": 20000
+}
+```
+
+These can also be set with:
+
+- `HYDRADB_REQUEST_TIMEOUT_MS`
+- `HYDRADB_WRITE_TIMEOUT_MS`
+
+## 5. What gets synced from the workspace
 
 By default the plugin syncs only markdown-first workspace context:
 
@@ -135,7 +156,7 @@ If you want text files too, extend `includeGlobs`:
 }
 ```
 
-## 5. Ignore marker
+## 6. Ignore marker
 
 The default ignore marker is `hydra-ignore`.
 
@@ -146,7 +167,7 @@ You can place it:
 
 Important: the ignore marker skips capture and sync. It does not disable recall for that prompt.
 
-## 6. User-facing commands
+## 7. User-facing commands
 
 - `/hydradb:setup`
 - `/hydradb:status`
@@ -157,7 +178,7 @@ Important: the ignore marker skips capture and sync. It does not disable recall 
 
 The plugin also exposes CLI entry points through `node scripts/plugin.mjs` for local testing.
 
-## 7. What auto recall injects
+## 8. What auto recall injects
 
 On each user prompt, the plugin can inject a bounded `<hydradb-context>` block containing:
 
@@ -169,7 +190,7 @@ On each user prompt, the plugin can inject a bounded `<hydradb-context>` block c
 
 This content is explicitly framed as reference material, not as new instructions.
 
-## 8. Recommended starting presets
+## 9. Recommended starting presets
 
 ### Team docs + durable memory
 

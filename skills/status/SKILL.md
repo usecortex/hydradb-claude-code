@@ -20,6 +20,7 @@ Summarize:
 - whether auto-recall and auto-ingest are enabled
 - the active `captureMode`, `searchMode`, and `ingestionMode`
 - the active max prompt context budget
+- the active HydraDB read and write timeouts
 - how many files and sessions are currently tracked
 - any config validation errors
 

@@ -14,6 +14,8 @@
   "maxContextChars": 7000,
   "maxMemoryResults": 6,
   "maxKnowledgeResults": 4,
+  "requestTimeoutMs": 15000,
+  "writeTimeoutMs": 30000,
   "maxFileSizeBytes": 250000,
   "maxFilesPerSync": 25,
   "maxMemoryCharsPerChunk": 12000,

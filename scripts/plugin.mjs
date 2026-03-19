@@ -78,7 +78,9 @@ async function getRuntime() {
         baseUrl: configResult.config.apiBaseUrl,
         apiKey: configResult.config.apiKey,
         tenantId: configResult.config.tenantId,
-        subTenantId: configResult.config.subTenantId
+        subTenantId: configResult.config.subTenantId,
+        requestTimeoutMs: configResult.config.requestTimeoutMs,
+        writeTimeoutMs: configResult.config.writeTimeoutMs
       })
     : null;
 
@@ -450,6 +452,8 @@ function formatStatusText(summary) {
     `recallMode: ${summary.resolvedConfig.recallMode}`,
     `graphContext: ${summary.resolvedConfig.graphContext}`,
     `maxContextChars: ${summary.resolvedConfig.maxContextChars}`,
+    `requestTimeoutMs: ${summary.resolvedConfig.requestTimeoutMs}`,
+    `writeTimeoutMs: ${summary.resolvedConfig.writeTimeoutMs}`,
     `maxMemoryCharsPerChunk: ${summary.resolvedConfig.maxMemoryCharsPerChunk}`,
     `maxMemoryChunksPerFile: ${summary.resolvedConfig.maxMemoryChunksPerFile}`,
     `ignoreMarker: ${summary.resolvedConfig.ignoreMarker}`,

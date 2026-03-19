@@ -50,6 +50,8 @@ export const DEFAULTS = {
   maxContextChars: 7000,
   maxMemoryResults: 6,
   maxKnowledgeResults: 4,
+  requestTimeoutMs: 15000,
+  writeTimeoutMs: 30000,
   maxFileSizeBytes: 250000,
   maxFilesPerSync: 25,
   maxMemoryCharsPerChunk: 12000,
@@ -77,6 +79,8 @@ const KNOWN_KEYS = new Set([
   "maxContextChars",
   "maxMemoryResults",
   "maxKnowledgeResults",
+  "requestTimeoutMs",
+  "writeTimeoutMs",
   "maxFileSizeBytes",
   "maxFilesPerSync",
   "maxMemoryCharsPerChunk",
@@ -318,6 +322,8 @@ export async function loadConfig(cwd, dataDir) {
     maxContextChars: parseEnvNumber("HYDRADB_MAX_CONTEXT_CHARS"),
     maxMemoryResults: parseEnvNumber("HYDRADB_MAX_MEMORY_RESULTS"),
     maxKnowledgeResults: parseEnvNumber("HYDRADB_MAX_KNOWLEDGE_RESULTS"),
+    requestTimeoutMs: parseEnvNumber("HYDRADB_REQUEST_TIMEOUT_MS"),
+    writeTimeoutMs: parseEnvNumber("HYDRADB_WRITE_TIMEOUT_MS"),
     maxFileSizeBytes: parseEnvNumber("HYDRADB_MAX_FILE_SIZE_BYTES"),
     maxFilesPerSync: parseEnvNumber("HYDRADB_MAX_FILES_PER_SYNC"),
     maxMemoryCharsPerChunk: parseEnvNumber("HYDRADB_MAX_MEMORY_CHARS_PER_CHUNK"),
@@ -400,6 +406,20 @@ export async function loadConfig(cwd, dataDir) {
       errors,
       "maxKnowledgeResults",
       { min: 1 }
+    ),
+    requestTimeoutMs: parseNumber(
+      merged.requestTimeoutMs,
+      DEFAULTS.requestTimeoutMs,
+      errors,
+      "requestTimeoutMs",
+      { min: 1000 }
+    ),
+    writeTimeoutMs: parseNumber(
+      merged.writeTimeoutMs,
+      DEFAULTS.writeTimeoutMs,
+      errors,
+      "writeTimeoutMs",
+      { min: 1000 }
     ),
     maxFileSizeBytes: parseNumber(
       merged.maxFileSizeBytes,
@@ -515,6 +535,8 @@ export function formatStatus(configResult, state) {
       maxContextChars: config.maxContextChars,
       maxMemoryResults: config.maxMemoryResults,
       maxKnowledgeResults: config.maxKnowledgeResults,
+      requestTimeoutMs: config.requestTimeoutMs,
+      writeTimeoutMs: config.writeTimeoutMs,
       maxFileSizeBytes: config.maxFileSizeBytes,
       maxFilesPerSync: config.maxFilesPerSync,
       maxMemoryCharsPerChunk: config.maxMemoryCharsPerChunk,

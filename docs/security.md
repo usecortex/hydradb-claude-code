@@ -17,6 +17,7 @@ This document summarizes the current safeguards in the HydraDB Claude Code plugi
 - `captureMode`, `searchMode`, and `ingestionMode` are explicit and configurable
 - config warnings now flag common ingest/recall mismatches
 - invalid boolean environment variables now produce config notes instead of silently becoming `false`
+- configurable HydraDB read and write timeouts keep stalled network calls from consuming the full hook budget
 - session-upsert mode now keeps short turns in the local session transcript
 - session state merging is timestamp-aware for prompt buffers, turn buffers, turn capture hashes, and session transcript hashes
 - prompt-time context injection now preserves graph paths, chunk relations, and additional context returned by HydraDB
