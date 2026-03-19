@@ -362,7 +362,10 @@ export async function syncWorkspace({
 
   const memoryItems = memoryFiles.flatMap((file) => buildMemoryItems(file, projectRoot, config));
   for (let index = 0; index < memoryItems.length; index += 10) {
-    await client.addMemories(memoryItems.slice(index, index + 10), { upsert: true, timeoutMs: 30000 });
+    await client.addMemories(memoryItems.slice(index, index + 10), {
+      upsert: true,
+      timeoutMs: config.writeTimeoutMs
+    });
   }
 
   for (let index = 0; index < knowledgeFiles.length; index += 5) {
