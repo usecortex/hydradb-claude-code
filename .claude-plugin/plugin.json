@@ -1,0 +1,20 @@
+{
+  "name": "hydradb",
+  "version": "1.0.0",
+  "description": "Secure HydraDB automation for Claude Code with workspace sync, prompt recall, and conversation capture.",
+  "author": {
+    "name": "Cortex",
+    "email": "soham@usecortex.ai",
+    "url": "https://hydradb.com"
+  },
+  "homepage": "https://docs.hydradb.com/",
+  "repository": "https://github.com/usecortex/hydrdb-claude-plugin",
+  "license": "MIT",
+  "keywords": [
+    "hydradb",
+    "memory",
+    "retrieval",
+    "claude-code",
+    "knowledge-base"
+  ]
+}

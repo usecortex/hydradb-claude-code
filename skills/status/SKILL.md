@@ -1,0 +1,25 @@
+---
+name: status
+description: Inspect HydraDB plugin configuration, active settings, and sync state for the current workspace. Use when the user asks if HydraDB is working or why sync or recall is not happening.
+disable-model-invocation: true
+allowed-tools: Bash(node *)
+---
+
+Check HydraDB plugin status for the current workspace:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/plugin.mjs" status --json
+```
+
+Summarize:
+
+- whether the plugin is configured
+- which config layers or files were resolved
+- which API base URL is active
+- the active sub-tenant
+- whether auto-recall, auto-capture, and auto-ingest are enabled
+- the active max prompt context budget
+- how many files and sessions are currently tracked
+- any config validation errors
+
+If configuration is missing or broken, point the user to `/hydradb:setup`. If `autoCapture` is off, mention that manual session saving is available via `/hydradb:save-session`.
