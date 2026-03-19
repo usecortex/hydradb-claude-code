@@ -10,10 +10,7 @@ const DEFAULT_INCLUDE_GLOBS = [
   "CLAUDE.md",
   ".claude/**/*.md",
   "**/*.md",
-  "**/*.mdx",
-  "**/*.txt",
-  "**/*.rst",
-  "**/*.adoc"
+  "**/*.mdx"
 ];
 
 const DEFAULT_EXCLUDE_GLOBS = [
@@ -44,15 +41,19 @@ const DEFAULT_EXCLUDE_GLOBS = [
 export const DEFAULTS = {
   apiBaseUrl: "https://api.hydradb.com",
   autoRecall: true,
-  autoCapture: true,
   autoIngest: true,
+  captureMode: "turn",
+  searchMode: "memory",
+  ingestionMode: "memory",
   recallMode: "fast",
   graphContext: true,
   maxContextChars: 7000,
-  maxMemoryResults: 4,
-  maxKnowledgeResults: 6,
+  maxMemoryResults: 6,
+  maxKnowledgeResults: 4,
   maxFileSizeBytes: 250000,
   maxFilesPerSync: 25,
+  maxMemoryCharsPerChunk: 12000,
+  maxMemoryChunksPerFile: 8,
   includeGlobs: DEFAULT_INCLUDE_GLOBS,
   excludeGlobs: DEFAULT_EXCLUDE_GLOBS,
   ignoreMarker: "hydra-ignore",
@@ -68,6 +69,9 @@ const KNOWN_KEYS = new Set([
   "autoRecall",
   "autoCapture",
   "autoIngest",
+  "captureMode",
+  "searchMode",
+  "ingestionMode",
   "recallMode",
   "graphContext",
   "maxContextChars",
@@ -75,11 +79,14 @@ const KNOWN_KEYS = new Set([
   "maxKnowledgeResults",
   "maxFileSizeBytes",
   "maxFilesPerSync",
+  "maxMemoryCharsPerChunk",
+  "maxMemoryChunksPerFile",
   "includeGlobs",
   "excludeGlobs",
   "ignoreMarker",
   "debug",
-  "memoryCustomInstructions"
+  "memoryCustomInstructions",
+  "workspaceMemoryCustomInstructions"
 ]);
 
 function envOrUndefined(name) {
@@ -172,6 +179,24 @@ function parseStringArray(value, fallback, errors, label) {
   return value;
 }
 
+function parseMode(value, fallback, errors, label, allowed) {
+  if (value == null) {
+    return fallback;
+  }
+
+  if (typeof value !== "string") {
+    errors.push(`${label} must be one of ${allowed.join(", ")}`);
+    return fallback;
+  }
+
+  if (!allowed.includes(value)) {
+    errors.push(`${label} must be one of ${allowed.join(", ")}`);
+    return fallback;
+  }
+
+  return value;
+}
+
 function sanitizeSegment(value) {
   return value
     .toLowerCase()
@@ -198,12 +223,22 @@ async function findProjectRoot(startDir) {
   }
 }
 
-function parseEnvBoolean(name) {
+function parseEnvBoolean(name, errors) {
   const value = envOrUndefined(name);
   if (value == null || value === "") {
     return undefined;
   }
-  return /^(1|true|yes|on)$/i.test(value);
+
+  if (/^(1|true|yes|on)$/i.test(value)) {
+    return true;
+  }
+
+  if (/^(0|false|no|off)$/i.test(value)) {
+    return false;
+  }
+
+  errors.push(`${name} must be a boolean-like value (true/false, 1/0, yes/no, on/off)`);
+  return undefined;
 }
 
 function parseEnvNumber(name) {
@@ -269,19 +304,27 @@ export async function loadConfig(cwd, dataDir) {
     tenantId: envOrUndefined("HYDRADB_TENANT_ID"),
     subTenantId: envOrUndefined("HYDRADB_SUB_TENANT_ID"),
     userName: envOrUndefined("HYDRADB_USER_NAME"),
+    captureMode: envOrUndefined("HYDRADB_CAPTURE_MODE"),
+    searchMode: envOrUndefined("HYDRADB_SEARCH_MODE"),
+    ingestionMode: envOrUndefined("HYDRADB_INGESTION_MODE"),
     recallMode: envOrUndefined("HYDRADB_RECALL_MODE"),
     ignoreMarker: envOrUndefined("HYDRADB_IGNORE_MARKER"),
     memoryCustomInstructions: envOrUndefined("HYDRADB_MEMORY_CUSTOM_INSTRUCTIONS"),
-    autoRecall: parseEnvBoolean("HYDRADB_AUTO_RECALL"),
-    autoCapture: parseEnvBoolean("HYDRADB_AUTO_CAPTURE"),
-    autoIngest: parseEnvBoolean("HYDRADB_AUTO_INGEST"),
-    graphContext: parseEnvBoolean("HYDRADB_GRAPH_CONTEXT"),
-    debug: parseEnvBoolean("HYDRADB_DEBUG"),
+    autoCapture: parseEnvBoolean("HYDRADB_AUTO_CAPTURE", errors),
+    autoRecall: parseEnvBoolean("HYDRADB_AUTO_RECALL", errors),
+    autoIngest: parseEnvBoolean("HYDRADB_AUTO_INGEST", errors),
+    graphContext: parseEnvBoolean("HYDRADB_GRAPH_CONTEXT", errors),
+    debug: parseEnvBoolean("HYDRADB_DEBUG", errors),
     maxContextChars: parseEnvNumber("HYDRADB_MAX_CONTEXT_CHARS"),
     maxMemoryResults: parseEnvNumber("HYDRADB_MAX_MEMORY_RESULTS"),
     maxKnowledgeResults: parseEnvNumber("HYDRADB_MAX_KNOWLEDGE_RESULTS"),
     maxFileSizeBytes: parseEnvNumber("HYDRADB_MAX_FILE_SIZE_BYTES"),
-    maxFilesPerSync: parseEnvNumber("HYDRADB_MAX_FILES_PER_SYNC")
+    maxFilesPerSync: parseEnvNumber("HYDRADB_MAX_FILES_PER_SYNC"),
+    maxMemoryCharsPerChunk: parseEnvNumber("HYDRADB_MAX_MEMORY_CHARS_PER_CHUNK"),
+    maxMemoryChunksPerFile: parseEnvNumber("HYDRADB_MAX_MEMORY_CHUNKS_PER_FILE"),
+    workspaceMemoryCustomInstructions: envOrUndefined(
+      "HYDRADB_WORKSPACE_MEMORY_CUSTOM_INSTRUCTIONS"
+    )
   };
 
   merged = applyKnownKeys(
@@ -292,6 +335,13 @@ export async function loadConfig(cwd, dataDir) {
     "environment",
     errors
   );
+
+  const derivedCaptureMode =
+    typeof merged.captureMode === "string"
+      ? merged.captureMode
+      : merged.autoCapture === false
+        ? "off"
+        : DEFAULTS.captureMode;
 
   const config = {
     apiBaseUrl:
@@ -306,8 +356,28 @@ export async function loadConfig(cwd, dataDir) {
         : `claude-${sanitizeSegment(workspaceName)}`,
     userName: typeof merged.userName === "string" ? merged.userName : "",
     autoRecall: parseBoolean(merged.autoRecall, DEFAULTS.autoRecall, errors, "autoRecall"),
-    autoCapture: parseBoolean(merged.autoCapture, DEFAULTS.autoCapture, errors, "autoCapture"),
     autoIngest: parseBoolean(merged.autoIngest, DEFAULTS.autoIngest, errors, "autoIngest"),
+    captureMode: parseMode(
+      derivedCaptureMode,
+      DEFAULTS.captureMode,
+      errors,
+      "captureMode",
+      ["turn", "session-upsert", "both", "off"]
+    ),
+    searchMode: parseMode(
+      merged.searchMode,
+      DEFAULTS.searchMode,
+      errors,
+      "searchMode",
+      ["memory", "both", "knowledge"]
+    ),
+    ingestionMode: parseMode(
+      merged.ingestionMode,
+      DEFAULTS.ingestionMode,
+      errors,
+      "ingestionMode",
+      ["memory", "knowledge", "auto"]
+    ),
     recallMode: merged.recallMode === "thinking" ? "thinking" : "fast",
     graphContext: parseBoolean(merged.graphContext, DEFAULTS.graphContext, errors, "graphContext"),
     maxContextChars: parseNumber(
@@ -345,6 +415,20 @@ export async function loadConfig(cwd, dataDir) {
       "maxFilesPerSync",
       { min: 1 }
     ),
+    maxMemoryCharsPerChunk: parseNumber(
+      merged.maxMemoryCharsPerChunk,
+      DEFAULTS.maxMemoryCharsPerChunk,
+      errors,
+      "maxMemoryCharsPerChunk",
+      { min: 512 }
+    ),
+    maxMemoryChunksPerFile: parseNumber(
+      merged.maxMemoryChunksPerFile,
+      DEFAULTS.maxMemoryChunksPerFile,
+      errors,
+      "maxMemoryChunksPerFile",
+      { min: 1 }
+    ),
     includeGlobs: parseStringArray(
       merged.includeGlobs,
       DEFAULTS.includeGlobs,
@@ -365,8 +449,32 @@ export async function loadConfig(cwd, dataDir) {
     memoryCustomInstructions:
       typeof merged.memoryCustomInstructions === "string"
         ? merged.memoryCustomInstructions
+        : "",
+    workspaceMemoryCustomInstructions:
+      typeof merged.workspaceMemoryCustomInstructions === "string"
+        ? merged.workspaceMemoryCustomInstructions
         : ""
   };
+
+  if (config.autoIngest) {
+    if (config.ingestionMode === "memory" && config.searchMode === "knowledge") {
+      errors.push(
+        'searchMode=knowledge will not auto-recall workspace files synced with ingestionMode=memory. Use searchMode="both" or "memory" if you want synced workspace docs to appear automatically.'
+      );
+    }
+
+    if (config.ingestionMode === "knowledge" && config.searchMode === "memory") {
+      errors.push(
+        'searchMode=memory will not auto-recall workspace files synced with ingestionMode=knowledge. Use searchMode="both" or "knowledge" if you want synced workspace docs to appear automatically.'
+      );
+    }
+
+    if (config.ingestionMode === "auto" && config.searchMode !== "both") {
+      errors.push(
+        'ingestionMode=auto may sync smaller files to memory and larger files to knowledge. Use searchMode="both" if you want auto-recall to cover both paths consistently.'
+      );
+    }
+  }
 
   return {
     configured: Boolean(config.apiKey && config.tenantId),
@@ -398,8 +506,10 @@ export function formatStatus(configResult, state) {
       subTenantId: config.subTenantId,
       userName: config.userName || "",
       autoRecall: config.autoRecall,
-      autoCapture: config.autoCapture,
       autoIngest: config.autoIngest,
+      captureMode: config.captureMode,
+      searchMode: config.searchMode,
+      ingestionMode: config.ingestionMode,
       recallMode: config.recallMode,
       graphContext: config.graphContext,
       maxContextChars: config.maxContextChars,
@@ -407,6 +517,8 @@ export function formatStatus(configResult, state) {
       maxKnowledgeResults: config.maxKnowledgeResults,
       maxFileSizeBytes: config.maxFileSizeBytes,
       maxFilesPerSync: config.maxFilesPerSync,
+      maxMemoryCharsPerChunk: config.maxMemoryCharsPerChunk,
+      maxMemoryChunksPerFile: config.maxMemoryChunksPerFile,
       ignoreMarker: config.ignoreMarker,
       includeGlobs: config.includeGlobs,
       excludeGlobs: config.excludeGlobs,

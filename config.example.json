@@ -5,23 +5,24 @@
   "subTenantId": "claude-shared-workspace",
   "userName": "Soham",
   "autoRecall": true,
-  "autoCapture": true,
   "autoIngest": true,
+  "captureMode": "turn",
+  "searchMode": "memory",
+  "ingestionMode": "memory",
   "recallMode": "thinking",
   "graphContext": true,
   "maxContextChars": 7000,
-  "maxMemoryResults": 4,
-  "maxKnowledgeResults": 6,
+  "maxMemoryResults": 6,
+  "maxKnowledgeResults": 4,
   "maxFileSizeBytes": 250000,
   "maxFilesPerSync": 25,
+  "maxMemoryCharsPerChunk": 12000,
+  "maxMemoryChunksPerFile": 8,
   "includeGlobs": [
     "CLAUDE.md",
     ".claude/**/*.md",
     "**/*.md",
-    "**/*.mdx",
-    "**/*.txt",
-    "**/*.rst",
-    "**/*.adoc"
+    "**/*.mdx"
   ],
   "excludeGlobs": [
     ".git/**",
@@ -49,5 +50,6 @@
   ],
   "ignoreMarker": "hydra-ignore",
   "memoryCustomInstructions": "Extract durable user preferences, project decisions, recurring constraints, team conventions, and follow-up commitments. Ignore credentials, transient tool noise, and low-value chit-chat.",
+  "workspaceMemoryCustomInstructions": "Extract durable repository knowledge from documentation, specs, notes, architecture decisions, runbooks, and reference content. Prefer stable facts, conventions, requirements, workflows, and decisions. Ignore transient chatter, secrets, and code-only implementation details.",
   "debug": false
 }

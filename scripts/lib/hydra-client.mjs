@@ -7,6 +7,11 @@ export const DEFAULT_MEMORY_CAPTURE_INSTRUCTIONS =
   "team conventions, and follow-up commitments. Ignore credentials, transient tool noise, " +
   "and low-value chit-chat.";
 
+export const DEFAULT_WORKSPACE_MEMORY_INSTRUCTIONS =
+  "Extract durable repository knowledge from documentation, specs, notes, architecture decisions, " +
+  "runbooks, and reference content. Prefer stable facts, conventions, requirements, workflows, " +
+  "and decisions. Ignore transient chatter, secrets, and code-only implementation details.";
+
 function coerceErrorMessage(error) {
   return error instanceof Error ? error.message : String(error);
 }
@@ -63,6 +68,22 @@ function extractChunkTitle(chunk) {
   );
 }
 
+function extractChunkUuid(chunk) {
+  if (!chunk || typeof chunk !== "object") {
+    return "";
+  }
+
+  return chunk.chunk_uuid || chunk.chunk_id || chunk.id || chunk.source_id || "";
+}
+
+function extractExtraContextIds(chunk) {
+  if (!chunk || typeof chunk !== "object" || !Array.isArray(chunk.extra_context_ids)) {
+    return [];
+  }
+
+  return chunk.extra_context_ids.filter((entry) => typeof entry === "string").slice(0, 8);
+}
+
 function extractChunkRelations(chunk) {
   if (!chunk || typeof chunk !== "object") {
     return [];
@@ -92,6 +113,160 @@ function extractChunkRelations(chunk) {
     .slice(0, 3);
 }
 
+function sanitizeNode(node) {
+  if (typeof node === "string") {
+    return { name: trimText(redactSecrets(node), 120) };
+  }
+
+  if (!node || typeof node !== "object") {
+    return { name: "" };
+  }
+
+  return {
+    name: trimText(redactSecrets(node.name || node.label || node.id || ""), 120)
+  };
+}
+
+function sanitizeRelation(relation) {
+  if (typeof relation === "string") {
+    return { canonical_predicate: trimText(redactSecrets(relation), 80) };
+  }
+
+  if (!relation || typeof relation !== "object") {
+    return {};
+  }
+
+  return {
+    canonical_predicate: trimText(
+      redactSecrets(
+        relation.canonical_predicate || relation.predicate || relation.label || relation.type || ""
+      ),
+      80
+    ),
+    context: trimText(redactSecrets(relation.context || relation.description || ""), 180),
+    temporal_details: trimText(
+      redactSecrets(relation.temporal_details || relation.time || ""),
+      80
+    )
+  };
+}
+
+function sanitizeTriplet(triplet) {
+  if (!triplet || typeof triplet !== "object") {
+    return null;
+  }
+
+  return {
+    source: sanitizeNode(triplet.source),
+    relation: sanitizeRelation(triplet.relation),
+    target: sanitizeNode(triplet.target)
+  };
+}
+
+function sanitizePath(path) {
+  if (typeof path === "string") {
+    return trimText(redactSecrets(path), 160);
+  }
+
+  if (!path || typeof path !== "object") {
+    return null;
+  }
+
+  const triplets = Array.isArray(path.triplets)
+    ? path.triplets.map((triplet) => sanitizeTriplet(triplet)).filter(Boolean)
+    : [];
+
+  if (!triplets.length) {
+    const label = trimText(redactSecrets(path.path || path.label || ""), 160);
+    return label || null;
+  }
+
+  return { triplets };
+}
+
+function sanitizeChunkRelation(entry) {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+
+  const triplets = Array.isArray(entry.triplets)
+    ? entry.triplets.map((triplet) => sanitizeTriplet(triplet)).filter(Boolean)
+    : [];
+
+  if (!triplets.length) {
+    return null;
+  }
+
+  return {
+    groupId: trimText(redactSecrets(entry.group_id || entry.groupId || ""), 80),
+    triplets
+  };
+}
+
+function sanitizeChunkIdToGroupIds(value) {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([chunkId, groupIds]) => [
+        trimText(redactSecrets(chunkId), 120),
+        Array.isArray(groupIds)
+          ? groupIds
+              .filter((entry) => typeof entry === "string")
+              .map((entry) => trimText(redactSecrets(entry), 80))
+              .filter(Boolean)
+              .slice(0, 12)
+          : []
+      ])
+      .filter(([chunkId, groupIds]) => chunkId && groupIds.length)
+  );
+}
+
+function sanitizeAdditionalContextMap(value) {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([id, entry]) => {
+        if (!entry || typeof entry !== "object") {
+          return null;
+        }
+
+        const sourceTitle = trimText(
+          redactSecrets(entry.source_title || entry.title || entry.document_title || ""),
+          120
+        );
+        const chunkContent = trimText(
+          redactSecrets(
+            entry.chunk_content ||
+              entry.chunk_text ||
+              entry.text ||
+              entry.content?.text ||
+              entry.content ||
+              ""
+          )
+        );
+
+        if (!sourceTitle && !chunkContent) {
+          return null;
+        }
+
+        return [
+          trimText(redactSecrets(id), 120),
+          {
+            source_title: sourceTitle,
+            chunk_content: chunkContent
+          }
+        ];
+      })
+      .filter(Boolean)
+  );
+}
+
 function extractQueryPaths(response) {
   const paths =
     response?.graph_context?.query_paths ||
@@ -117,12 +292,27 @@ function extractQueryPaths(response) {
     .slice(0, 4);
 }
 
+function extractDetailedQueryPaths(response) {
+  const paths =
+    response?.graph_context?.query_paths ||
+    response?.query_paths ||
+    response?.graph_context?.paths ||
+    [];
+
+  if (!Array.isArray(paths)) {
+    return [];
+  }
+
+  return paths.map((entry) => sanitizePath(entry)).filter(Boolean).slice(0, 4);
+}
+
 function normalizeResponse(response) {
   const rawChunks = response?.chunks || response?.results || response?.context || [];
   const chunks = Array.isArray(rawChunks)
     ? rawChunks
         .map((chunk) => ({
           title: trimText(redactSecrets(extractChunkTitle(chunk)), 120),
+          sourceTitle: trimText(redactSecrets(extractChunkTitle(chunk)), 120),
           text: trimText(redactSecrets(extractChunkText(chunk))),
           score:
             typeof chunk?.score === "number"
@@ -131,6 +321,10 @@ function normalizeResponse(response) {
                 ? chunk.relevance_score
                 : undefined,
           sourceId: chunk?.source_id || chunk?.id || "",
+          chunkUuid: trimText(redactSecrets(extractChunkUuid(chunk)), 120),
+          extraContextIds: extractExtraContextIds(chunk).map((entry) =>
+            trimText(redactSecrets(entry), 120)
+          ),
           relations: extractChunkRelations(chunk).map((entry) =>
             trimText(redactSecrets(entry), 120)
           )
@@ -138,9 +332,24 @@ function normalizeResponse(response) {
         .filter((chunk) => chunk.text)
     : [];
 
+  const graphContext = {
+    queryPathsDetailed: extractDetailedQueryPaths(response),
+    chunkRelations: Array.isArray(response?.graph_context?.chunk_relations)
+      ? response.graph_context.chunk_relations
+          .map((entry) => sanitizeChunkRelation(entry))
+          .filter(Boolean)
+          .slice(0, 12)
+      : [],
+    chunkIdToGroupIds: sanitizeChunkIdToGroupIds(response?.graph_context?.chunk_id_to_group_ids)
+  };
+
   return {
     chunks,
-    queryPaths: extractQueryPaths(response)
+    queryPaths: extractQueryPaths(response),
+    graphContext,
+    additionalContext: sanitizeAdditionalContextMap(
+      response?.additional_context || response?.additionalContext
+    )
   };
 }
 
@@ -205,10 +414,21 @@ export class HydraClient {
     return normalizeResponse(await this.request("/recall/full_recall", payload));
   }
 
+  async addMemories(memories, options = {}) {
+    const payload = {
+      memories,
+      tenant_id: this.tenantId,
+      sub_tenant_id: this.subTenantId,
+      upsert: options.upsert ?? true
+    };
+
+    return this.request("/memories/add_memory", payload, { timeoutMs: options.timeoutMs ?? 30000 });
+  }
+
   async addTextMemory(text, options = {}) {
     const infer = options.infer ?? true;
-    const payload = {
-      memories: [
+    return this.addMemories(
+      [
         {
           text,
           infer,
@@ -220,17 +440,13 @@ export class HydraClient {
           source_id: options.sourceId || undefined
         }
       ],
-      tenant_id: this.tenantId,
-      sub_tenant_id: this.subTenantId,
-      upsert: true
-    };
-
-    return this.request("/memories/add_memory", payload);
+      { upsert: options.upsert ?? true }
+    );
   }
 
   async addConversationMemory(userText, assistantText, options = {}) {
-    const payload = {
-      memories: [
+    return this.addMemories(
+      [
         {
           user_assistant_pairs: [
             {
@@ -245,12 +461,8 @@ export class HydraClient {
           source_id: options.sourceId || undefined
         }
       ],
-      tenant_id: this.tenantId,
-      sub_tenant_id: this.subTenantId,
-      upsert: true
-    };
-
-    return this.request("/memories/add_memory", payload);
+      { upsert: options.upsert ?? true }
+    );
   }
 
   async uploadKnowledge(appKnowledge) {

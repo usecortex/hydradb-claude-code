@@ -17,9 +17,10 @@ Summarize:
 - which config layers or files were resolved
 - which API base URL is active
 - the active sub-tenant
-- whether auto-recall, auto-capture, and auto-ingest are enabled
+- whether auto-recall and auto-ingest are enabled
+- the active `captureMode`, `searchMode`, and `ingestionMode`
 - the active max prompt context budget
 - how many files and sessions are currently tracked
 - any config validation errors
 
-If configuration is missing or broken, point the user to `/hydradb:setup`. If `autoCapture` is off, mention that manual session saving is available via `/hydradb:save-session`.
+If configuration is missing or broken, point the user to `/hydradb:setup`. If `captureMode` is `off`, mention that manual session saving is available via `/hydradb:save-session`.

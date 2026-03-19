@@ -1,24 +1,80 @@
 # HydraDB Claude Code Plugin
 
-HydraDB automation for Claude Code with automatic workspace sync, prompt-time recall, and durable cross-session memory capture.
+HydraDB automation for Claude Code with markdown-first workspace sync, prompt-time recall, and configurable memory capture modes.
 
 ## Design goals
 
-This plugin is built around a simple default:
+This plugin is built around a HydraDB-native default:
 
-- automatic where it helps
-- bounded where prompt safety matters
-- explicit where secrets and config are involved
+- memory-first for docs and durable context
+- markdown-first to avoid code noise
+- bounded recall so prompt injection stays controlled
+- explicit modes so users can choose automation tradeoffs
 
-It complements the HydraDB MCP server. The MCP remains useful for direct tool access. This plugin handles the workflow automation layer so users do not have to manually ask Claude to sync files, remember decisions, or search prior context every time.
+It complements the HydraDB MCP server. The MCP remains useful for direct tool access, while this plugin handles the background workflow layer.
+
+## Docs
+
+- [Usage guide](./docs/usage.md)
+- [Security and reliability notes](./docs/security.md)
 
 ## What ships
 
-- `SessionStart` hook that announces HydraDB status and starts an async workspace sync
-- `UserPromptSubmit` hook that recalls relevant memories and knowledge before Claude answers
-- `PostToolUse` hook that re-syncs changed knowledge files after edits
-- `Stop` hook that captures durable user and assistant turns into memory
+- `SessionStart` hook that announces HydraDB status and starts an async sync
+- `UserPromptSubmit` hook that recalls HydraDB context before Claude answers
+- `PostToolUse` hook that re-syncs changed workspace docs
+- `Stop` hook that buffers sanitized turns and optionally writes them to HydraDB
 - user-facing skills for setup, status, search, remember, full-session save, and forced sync
+
+## Core model
+
+### Workspace sync
+
+- default target: `memory`
+- default file scope: markdown-first docs
+- optional fallback target: `knowledge` for users who want it or for `auto` mode
+
+Workspace files are treated as durable repo context, not as code indexing. The default include globs are:
+
+- `CLAUDE.md`
+- `.claude/**/*.md`
+- `**/*.md`
+- `**/*.mdx`
+
+If users want `txt` or broader patterns, they can extend `includeGlobs`.
+
+### Recall
+
+Recall is configurable with `searchMode`:
+
+- `memory` default
+- `both`
+- `knowledge`
+
+In `both` mode the plugin runs memory recall and knowledge recall in parallel and merges them into the injected `<hydradb-context>` block.
+
+When HydraDB returns graph context, the injected block can include:
+
+- entity path chains
+- chunk-level graph relations
+- linked extra context for recalled chunks
+
+### Capture
+
+Capture is configurable with `captureMode`:
+
+- `turn` default
+- `session-upsert`
+- `both`
+- `off`
+
+`turn` stores isolated user/assistant pairs.
+
+`session-upsert` maintains one evolving session transcript in HydraDB with a stable source id.
+
+`both` does both.
+
+`off` keeps only the local turn buffer so users can still manually save the session later.
 
 ## Automatic behavior
 
@@ -29,9 +85,9 @@ It complements the HydraDB MCP server. The MCP remains useful for direct tool ac
 
 ### Prompt submit
 
-- stores a sanitized pending prompt for later capture
-- skips slash commands and prompts containing the ignore marker
-- recalls relevant memories and workspace knowledge from HydraDB
+- stores a sanitized pending prompt for later turn handling
+- skips slash commands for capture
+- recalls according to `searchMode`
 - injects a bounded `<hydradb-context>` block into the prompt
 
 ### Post-tool use
@@ -41,10 +97,9 @@ It complements the HydraDB MCP server. The MCP remains useful for direct tool ac
 
 ### Stop
 
-- captures the latest prompt-response pair as memory
-- skips duplicate turns
-- redacts high-confidence secrets before sending content to HydraDB
-- buffers recent sanitized turns locally so a user can manually save the full session later
+- buffers recent sanitized turns locally
+- respects the ignore marker
+- writes to HydraDB according to `captureMode`
 
 ## Configuration model
 
@@ -75,8 +130,10 @@ export HYDRADB_USER_NAME="Soham"
 export HYDRADB_PLUGIN_CONFIG="/absolute/path/to/config.json"
 export HYDRADB_BASE_URL="https://api.hydradb.com"
 export HYDRADB_RECALL_MODE="thinking"
+export HYDRADB_CAPTURE_MODE="turn"
+export HYDRADB_SEARCH_MODE="memory"
+export HYDRADB_INGESTION_MODE="memory"
 export HYDRADB_AUTO_RECALL="true"
-export HYDRADB_AUTO_CAPTURE="true"
 export HYDRADB_AUTO_INGEST="true"
 export HYDRADB_MAX_CONTEXT_CHARS="7000"
 ```
@@ -92,15 +149,19 @@ See [config.example.json](./config.example.json) for the full shape and [.hydrad
   "subTenantId": "claude-my-workspace",
   "apiBaseUrl": "https://api.hydradb.com",
   "autoRecall": true,
-  "autoCapture": true,
   "autoIngest": true,
+  "captureMode": "turn",
+  "searchMode": "memory",
+  "ingestionMode": "memory",
   "recallMode": "thinking",
   "graphContext": true,
   "maxContextChars": 7000,
-  "maxMemoryResults": 4,
-  "maxKnowledgeResults": 6,
+  "maxMemoryResults": 6,
+  "maxKnowledgeResults": 4,
   "maxFileSizeBytes": 250000,
   "maxFilesPerSync": 25,
+  "maxMemoryCharsPerChunk": 12000,
+  "maxMemoryChunksPerFile": 8,
   "ignoreMarker": "hydra-ignore"
 }
 ```
@@ -109,10 +170,12 @@ See [config.example.json](./config.example.json) for the full shape and [.hydrad
 
 - prefers environment variables for secrets
 - skips common sensitive files and directories before ingestion
-- only syncs text-like documentation formats by default
+- only syncs markdown-style documentation formats by default
 - redacts high-confidence secrets before sync, recall injection, and memory capture
 - treats recalled HydraDB content as supporting context, not new instructions
 - supports an opt-out marker, `hydra-ignore`, for prompts and files
+
+See [docs/security.md](./docs/security.md) for the fuller bug/security note, remaining limits, and recommended safer defaults.
 
 ## Skills
 
@@ -125,21 +188,39 @@ See [config.example.json](./config.example.json) for the full shape and [.hydrad
 
 The plugin also includes a hidden `hydradb-context` skill that tells Claude how to interpret injected HydraDB context blocks.
 
-## Manual-only memory mode
+## Manual and low-automation modes
 
-If a user does not want automatic memory capture, set:
+If a user does not want automatic memory writes, set:
 
 ```json
 {
-  "autoCapture": false
+  "captureMode": "off"
 }
 ```
 
-In that mode the plugin still supports:
+If a user wants rolling whole-session context instead of isolated turn memories, set:
+
+```json
+{
+  "captureMode": "session-upsert"
+}
+```
+
+If a user wants both turn memories and a rolling session transcript:
+
+```json
+{
+  "captureMode": "both"
+}
+```
+
+In lower-automation modes the plugin still supports:
 
 - automatic recall on prompts, if `autoRecall` stays enabled
 - manual note saving with `/hydradb:remember`
 - full buffered session saving with `/hydradb:save-session`
+
+The ignore marker only suppresses sync/capture. It does not disable recall for that prompt.
 
 ## Local development
 
@@ -149,7 +230,7 @@ Validate the plugin:
 npm run check
 ```
 
-Load it directly into Claude Code:
+Load it into Claude Code using the local plugin development flow supported by your installed Claude Code version. If your build supports `--plugin-dir`, you can use:
 
 ```bash
 claude --plugin-dir .
@@ -160,5 +241,5 @@ After edits, run `/reload-plugins` inside Claude Code.
 ## Known limits
 
 - removed files are not deleted from HydraDB yet
-- workspace sync is intentionally docs-first, not full codebase indexing
+- workspace sync is intentionally markdown-first, not full codebase indexing
 - the plugin stores runtime state in `${CLAUDE_PLUGIN_DATA}` or `./.hydradb-plugin-data/`

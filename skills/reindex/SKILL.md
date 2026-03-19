@@ -1,6 +1,6 @@
 ---
 name: reindex
-description: Deprecated hidden alias for syncing workspace knowledge into HydraDB.
+description: Deprecated hidden alias for syncing workspace context into HydraDB.
 disable-model-invocation: true
 user-invocable: false
 ---

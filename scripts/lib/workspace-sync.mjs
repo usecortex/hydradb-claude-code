@@ -2,6 +2,9 @@ import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import path from "node:path";
 
+import {
+  DEFAULT_WORKSPACE_MEMORY_INSTRUCTIONS
+} from "./hydra-client.mjs";
 import { redactSecrets } from "./sanitize.mjs";
 
 const SKIPPED_DIRECTORIES = new Set([
@@ -101,6 +104,113 @@ function normalizeText(value) {
   return value.replace(/\r\n/g, "\n").trim();
 }
 
+function isMarkdownPath(relPath) {
+  return [".md", ".mdx"].includes(path.extname(relPath).toLowerCase());
+}
+
+function splitIntoChunks(text, maxChars) {
+  if (!text) {
+    return [];
+  }
+
+  if (text.length <= maxChars) {
+    return [text];
+  }
+
+  const blocks = text.split(/\n{2,}/g);
+  const chunks = [];
+  let current = "";
+
+  for (const block of blocks) {
+    const candidate = current ? `${current}\n\n${block}` : block;
+    if (candidate.length <= maxChars) {
+      current = candidate;
+      continue;
+    }
+
+    if (current) {
+      chunks.push(current.trim());
+      current = "";
+    }
+
+    if (block.length <= maxChars) {
+      current = block;
+      continue;
+    }
+
+    for (let offset = 0; offset < block.length; offset += maxChars) {
+      const slice = block.slice(offset, offset + maxChars).trim();
+      if (slice) {
+        chunks.push(slice);
+      }
+    }
+  }
+
+  if (current.trim()) {
+    chunks.push(current.trim());
+  }
+
+  return chunks;
+}
+
+function chooseIngestionTarget(config, chunkCount) {
+  if (config.ingestionMode === "memory") {
+    return "memory";
+  }
+
+  if (config.ingestionMode === "knowledge") {
+    return "knowledge";
+  }
+
+  return chunkCount <= config.maxMemoryChunksPerFile ? "memory" : "knowledge";
+}
+
+function buildMemoryItems(file, projectRoot, config) {
+  const chunks = splitIntoChunks(file.content, config.maxMemoryCharsPerChunk);
+  const baseSourceId = fileSourceId(projectRoot, file.relPath);
+  const customInstructions =
+    config.workspaceMemoryCustomInstructions || DEFAULT_WORKSPACE_MEMORY_INSTRUCTIONS;
+
+  return chunks.map((chunk, index) => ({
+    text: chunk,
+    infer: true,
+    is_markdown: file.isMarkdown,
+    title:
+      chunks.length === 1
+        ? file.relPath
+        : `${file.relPath} (part ${index + 1}/${chunks.length})`,
+    user_name: config.userName || undefined,
+    custom_instructions: customInstructions,
+    source_id:
+      chunks.length === 1 ? baseSourceId : `${baseSourceId}:chunk:${index + 1}`
+  }));
+}
+
+function buildKnowledgeItem(file, projectRoot, workspaceName) {
+  return {
+    id: fileSourceId(projectRoot, file.relPath),
+    tenant_id: file.tenantId,
+    sub_tenant_id: file.subTenantId,
+    title: file.relPath,
+    source: "claude-code-plugin",
+    description: `Workspace context synced from ${workspaceName}`,
+    url: `hydradb://workspace/${encodeURIComponent(workspaceName)}/${file.relPath}`,
+    timestamp: new Date(file.stats.mtimeMs).toISOString(),
+    content: {
+      text: file.content
+    },
+    metadata: {
+      workspace: workspaceName,
+      relative_path: file.relPath,
+      extension: path.extname(file.relPath) || "none"
+    },
+    additional_metadata: {
+      size_bytes: file.stats.size,
+      plugin: "hydradb"
+    }
+  };
+}
+
 export function extractPathsFromToolInput(toolInput, cwd) {
   if (!toolInput || typeof toolInput !== "object") {
     return [];
@@ -168,14 +278,16 @@ async function candidateSummary(filePath, projectRoot, config) {
   const digest = crypto.createHash("sha256").update(content).digest("hex");
   return {
     eligible: true,
+    filePath,
     relPath,
     content: redactedContent,
     digest,
-    stats
+    stats,
+    isMarkdown: isMarkdownPath(relPath)
   };
 }
 
-async function gatherFiles(projectRoot, config) {
+async function gatherFiles(projectRoot) {
   const relPaths = [];
   await walk(projectRoot, relPaths);
   return relPaths.map((relPath) => path.join(projectRoot, relPath));
@@ -190,14 +302,18 @@ export async function syncWorkspace({
   candidatePaths = null,
   force = false
 }) {
-  const filesToCheck = candidatePaths ?? (await gatherFiles(projectRoot, config));
+  const filesToCheck = candidatePaths ?? (await gatherFiles(projectRoot));
   const summary = {
     scanned: 0,
     synced: 0,
     skipped: 0,
     errors: [],
     syncedFiles: [],
-    skippedFiles: []
+    skippedFiles: [],
+    syncedAs: {
+      memory: 0,
+      knowledge: 0
+    }
   };
 
   const staged = [];
@@ -222,12 +338,15 @@ export async function syncWorkspace({
         continue;
       }
 
+      const chunkCount = splitIntoChunks(details.content, config.maxMemoryCharsPerChunk).length;
+      const target = chooseIngestionTarget(config, chunkCount);
+
       staged.push({
-        filePath,
-        relPath: details.relPath,
-        content: details.content,
-        digest: details.digest,
-        stats: details.stats
+        ...details,
+        chunkCount,
+        target,
+        tenantId: client.tenantId,
+        subTenantId: client.subTenantId
       });
     } catch (error) {
       summary.errors.push(`${filePath}: ${error.message}`);
@@ -238,43 +357,32 @@ export async function syncWorkspace({
     }
   }
 
-  for (let index = 0; index < staged.length; index += 5) {
-    const batch = staged.slice(index, index + 5);
-    const payload = batch.map((file) => ({
-      id: fileSourceId(projectRoot, file.relPath),
-      tenant_id: client.tenantId,
-      sub_tenant_id: client.subTenantId,
-      title: file.relPath,
-      source: "claude-code-plugin",
-      description: `Workspace knowledge synced from ${workspaceName}`,
-      url: `file://${file.filePath}`,
-      timestamp: new Date(file.stats.mtimeMs).toISOString(),
-      content: {
-        text: file.content
-      },
-      metadata: {
-        workspace: workspaceName,
-        relative_path: file.relPath,
-        extension: path.extname(file.relPath) || "none"
-      },
-      additional_metadata: {
-        size_bytes: file.stats.size,
-        plugin: "hydradb",
-        content_redacted: file.redacted
-      }
-    }));
+  const memoryFiles = staged.filter((file) => file.target === "memory");
+  const knowledgeFiles = staged.filter((file) => file.target === "knowledge");
 
-    await client.uploadKnowledge(payload);
+  const memoryItems = memoryFiles.flatMap((file) => buildMemoryItems(file, projectRoot, config));
+  for (let index = 0; index < memoryItems.length; index += 10) {
+    await client.addMemories(memoryItems.slice(index, index + 10), { upsert: true, timeoutMs: 30000 });
+  }
 
-    for (const file of batch) {
-      state.files[file.filePath] = {
-        digest: file.digest,
-        relPath: file.relPath,
-        syncedAt: new Date().toISOString()
-      };
-      summary.synced += 1;
-      summary.syncedFiles.push(file.relPath);
-    }
+  for (let index = 0; index < knowledgeFiles.length; index += 5) {
+    const batch = knowledgeFiles.slice(index, index + 5).map((file) =>
+      buildKnowledgeItem(file, projectRoot, workspaceName)
+    );
+    await client.uploadKnowledge(batch);
+  }
+
+  for (const file of staged) {
+    state.files[file.filePath] = {
+      digest: file.digest,
+      relPath: file.relPath,
+      syncedAt: new Date().toISOString(),
+      target: file.target,
+      chunkCount: file.chunkCount
+    };
+    summary.synced += 1;
+    summary.syncedFiles.push({ path: file.relPath, target: file.target });
+    summary.syncedAs[file.target] += 1;
   }
 
   return summary;

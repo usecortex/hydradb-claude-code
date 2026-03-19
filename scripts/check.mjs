@@ -9,6 +9,7 @@ const root = process.cwd();
 const scriptFiles = [
   "scripts/plugin.mjs",
   "scripts/lib/config.mjs",
+  "scripts/lib/context-format.mjs",
   "scripts/lib/hydra-client.mjs",
   "scripts/lib/sanitize.mjs",
   "scripts/lib/state.mjs",

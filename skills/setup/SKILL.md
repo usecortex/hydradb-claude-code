@@ -29,8 +29,10 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/plugin.mjs" status --json
   "apiKey": "${HYDRADB_API_KEY}",
   "tenantId": "${HYDRADB_TENANT_ID}",
   "autoRecall": true,
-  "autoCapture": false,
   "autoIngest": true,
+  "captureMode": "off",
+  "searchMode": "memory",
+  "ingestionMode": "memory",
   "recallMode": "thinking",
   "graphContext": true,
   "maxContextChars": 7000,
@@ -55,4 +57,8 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/plugin.mjs" status --json
 node "${CLAUDE_PLUGIN_ROOT}/scripts/plugin.mjs" status
 ```
 
-9. If the user wants manual-only memory, set `autoCapture` to `false` and point them to `/hydradb:remember` or `/hydradb:save-session`.
+9. If the user wants manual-only memory, set `captureMode` to `off` and point them to `/hydradb:remember` or `/hydradb:save-session`.
+
+10. If the user wants whole-session upsert behavior, set `captureMode` to `session-upsert`. If they want both isolated turns and rolling session memories, set it to `both`.
+
+11. The default workspace sync target should usually be `ingestionMode: "memory"`, with markdown-first `includeGlobs`. Only recommend `knowledge` or `both` recall if the user understands the tradeoff.

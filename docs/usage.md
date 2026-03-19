@@ -1,0 +1,202 @@
+# HydraDB Plugin Usage
+
+This guide covers the day-to-day setup and operating modes for the HydraDB Claude Code plugin.
+
+## 1. Configure HydraDB
+
+At minimum, provide:
+
+```bash
+export HYDRADB_API_KEY="..."
+export HYDRADB_TENANT_ID="tenant_123"
+```
+
+Then add a workspace config if you want repo-specific behavior:
+
+```json
+{
+  "subTenantId": "claude-my-workspace",
+  "captureMode": "turn",
+  "searchMode": "memory",
+  "ingestionMode": "memory"
+}
+```
+
+The plugin reads config from:
+
+1. built-in defaults
+2. `HYDRADB_PLUGIN_CONFIG`
+3. `${CLAUDE_PLUGIN_DATA}/config.json`
+4. `./.hydradb-plugin-data/config.json`
+5. `.hydradb-plugin.json`
+6. `.hydradb-plugin.local.json`
+7. environment variable overrides
+
+## 2. Pick your automation level
+
+### Default mode
+
+```json
+{
+  "autoRecall": true,
+  "autoIngest": true,
+  "captureMode": "turn",
+  "searchMode": "memory",
+  "ingestionMode": "memory"
+}
+```
+
+Use this when you want:
+
+- markdown docs synced into HydraDB memory with `infer`
+- prompt-time recall from memory by default
+- isolated user/assistant turn capture instead of whole-session snapshots
+
+### Rolling full-session mode
+
+```json
+{
+  "captureMode": "session-upsert"
+}
+```
+
+Use this when you want one evolving session memory that gets upserted after each assistant response.
+
+### Hybrid mode
+
+```json
+{
+  "captureMode": "both",
+  "searchMode": "both"
+}
+```
+
+Use this when you want:
+
+- isolated turn memories
+- a rolling session transcript
+- memory recall and knowledge recall in parallel
+
+### Manual-save mode
+
+```json
+{
+  "captureMode": "off"
+}
+```
+
+Use this when you want automatic recall and sync, but no automatic memory writes from the conversation.
+
+## 3. Understand the three mode knobs
+
+### `captureMode`
+
+- `turn`: save isolated user/assistant pairs
+- `session-upsert`: keep one evolving session transcript
+- `both`: do both
+- `off`: do not auto-save conversation content
+
+### `searchMode`
+
+- `memory`: recall memories only
+- `both`: recall memories and knowledge in parallel
+- `knowledge`: recall knowledge only
+
+### `ingestionMode`
+
+- `memory`: sync workspace docs into memory using `infer`
+- `knowledge`: sync workspace docs as knowledge
+- `auto`: prefer memory, but fall back to knowledge for larger files
+
+If you use `ingestionMode: "auto"`, pair it with `searchMode: "both"` so auto recall can see both storage paths.
+
+## 4. What gets synced from the workspace
+
+By default the plugin syncs only markdown-first workspace context:
+
+- `CLAUDE.md`
+- `.claude/**/*.md`
+- `**/*.md`
+- `**/*.mdx`
+
+This is intentional. HydraDB is not being used here as a code indexer.
+
+If you want text files too, extend `includeGlobs`:
+
+```json
+{
+  "includeGlobs": [
+    "CLAUDE.md",
+    ".claude/**/*.md",
+    "**/*.md",
+    "**/*.mdx",
+    "**/*.txt"
+  ]
+}
+```
+
+## 5. Ignore marker
+
+The default ignore marker is `hydra-ignore`.
+
+You can place it:
+
+- in a file to keep that file out of workspace sync
+- in a prompt to skip saving that prompt and its reply to HydraDB
+
+Important: the ignore marker skips capture and sync. It does not disable recall for that prompt.
+
+## 6. User-facing commands
+
+- `/hydradb:setup`
+- `/hydradb:status`
+- `/hydradb:search <query>`
+- `/hydradb:remember <note>`
+- `/hydradb:save-session`
+- `/hydradb:sync-workspace [--force]`
+
+The plugin also exposes CLI entry points through `node scripts/plugin.mjs` for local testing.
+
+## 7. What auto recall injects
+
+On each user prompt, the plugin can inject a bounded `<hydradb-context>` block containing:
+
+- retrieved memory chunks
+- retrieved knowledge chunks
+- entity path chains from graph context
+- chunk-level graph relations
+- extra linked context when HydraDB returns it
+
+This content is explicitly framed as reference material, not as new instructions.
+
+## 8. Recommended starting presets
+
+### Team docs + durable memory
+
+```json
+{
+  "captureMode": "turn",
+  "searchMode": "memory",
+  "ingestionMode": "memory"
+}
+```
+
+### Cross-session continuity
+
+```json
+{
+  "captureMode": "session-upsert",
+  "searchMode": "memory",
+  "ingestionMode": "memory"
+}
+```
+
+### Maximum recall coverage
+
+```json
+{
+  "captureMode": "both",
+  "searchMode": "both",
+  "ingestionMode": "auto"
+}
+```
