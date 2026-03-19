@@ -2,7 +2,7 @@ import { redactSecrets } from "./sanitize.mjs";
 
 const DEFAULT_API_BASE = "https://api.hydradb.com";
 const DEFAULT_REQUEST_TIMEOUT_MS = 15000;
-const DEFAULT_WRITE_TIMEOUT_MS = 30000;
+const DEFAULT_WRITE_TIMEOUT_MS = 15000;
 
 export const DEFAULT_MEMORY_CAPTURE_INSTRUCTIONS =
   "Extract durable user preferences, working style, project decisions, recurring constraints, " +

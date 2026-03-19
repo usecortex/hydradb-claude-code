@@ -137,7 +137,7 @@ export HYDRADB_AUTO_RECALL="true"
 export HYDRADB_AUTO_INGEST="true"
 export HYDRADB_MAX_CONTEXT_CHARS="7000"
 export HYDRADB_REQUEST_TIMEOUT_MS="15000"
-export HYDRADB_WRITE_TIMEOUT_MS="30000"
+export HYDRADB_WRITE_TIMEOUT_MS="15000"
 ```
 
 See [config.example.json](./config.example.json) for the full shape and [.hydradb-plugin.json.example](./.hydradb-plugin.json.example) for a workspace-scoped starting point.
@@ -161,7 +161,7 @@ See [config.example.json](./config.example.json) for the full shape and [.hydrad
   "maxMemoryResults": 6,
   "maxKnowledgeResults": 4,
   "requestTimeoutMs": 15000,
-  "writeTimeoutMs": 30000,
+  "writeTimeoutMs": 15000,
   "maxFileSizeBytes": 250000,
   "maxFilesPerSync": 25,
   "maxMemoryCharsPerChunk": 12000,

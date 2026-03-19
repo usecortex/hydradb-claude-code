@@ -51,7 +51,7 @@ export const DEFAULTS = {
   maxMemoryResults: 6,
   maxKnowledgeResults: 4,
   requestTimeoutMs: 15000,
-  writeTimeoutMs: 30000,
+  writeTimeoutMs: 15000,
   maxFileSizeBytes: 250000,
   maxFilesPerSync: 25,
   maxMemoryCharsPerChunk: 12000,

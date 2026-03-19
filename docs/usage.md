@@ -20,7 +20,7 @@ Then add a workspace config if you want repo-specific behavior:
   "searchMode": "memory",
   "ingestionMode": "memory",
   "requestTimeoutMs": 15000,
-  "writeTimeoutMs": 30000
+  "writeTimeoutMs": 15000
 }
 ```
 
@@ -125,6 +125,8 @@ Example:
   "writeTimeoutMs": 20000
 }
 ```
+
+For the blocking Claude hooks, it is safest to keep these below the hook time budgets unless you intentionally want slower retries.
 
 These can also be set with:
 

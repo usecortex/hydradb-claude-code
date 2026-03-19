@@ -37,7 +37,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/plugin.mjs" status --json
   "graphContext": true,
   "maxContextChars": 7000,
   "requestTimeoutMs": 15000,
-  "writeTimeoutMs": 30000,
+  "writeTimeoutMs": 15000,
   "ignoreMarker": "hydra-ignore"
 }
 ```
