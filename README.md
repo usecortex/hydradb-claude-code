@@ -241,6 +241,12 @@ Load it into Claude Code using the local plugin development flow supported by yo
 claude --plugin-dir .
 ```
 
+If `claude --plugin-dir .` fails with `unknown option '--plugin-dir'`, update Claude Code first:
+
+```bash
+claude update
+```
+
 After edits, run `/reload-plugins` inside Claude Code.
 
 ## Known limits
