@@ -6,7 +6,7 @@
   "userName": "Soham",
   "autoRecall": true,
   "autoIngest": true,
-  "captureMode": "turn",
+  "captureMode": "session-upsert",
   "searchMode": "memory",
   "ingestionMode": "memory",
   "recallMode": "thinking",

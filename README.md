@@ -63,14 +63,14 @@ When HydraDB returns graph context, the injected block can include:
 
 Capture is configurable with `captureMode`:
 
-- `turn` default
-- `session-upsert`
+- `session-upsert` default
+- `turn`
 - `both`
 - `off`
 
-`turn` stores isolated user/assistant pairs.
-
 `session-upsert` maintains one evolving session transcript in HydraDB with a stable source id.
+
+`turn` stores isolated user/assistant pairs.
 
 `both` does both.
 
@@ -113,16 +113,17 @@ The plugin uses a flat JSON config shape. It resolves config in this order:
 6. `.hydradb-plugin.local.json` at the workspace root
 7. environment variable overrides
 
-If `subTenantId` is omitted, the plugin derives a default value as `claude-<workspace-name>`.
+`subTenantId` must now be provided explicitly. If you want HydraDB to use its default sub-tenant, set it to `""` instead of omitting it.
 
 ### Required environment variables
 
 ```bash
 export HYDRADB_API_KEY="..."
 export HYDRADB_TENANT_ID="tenant_123"
+export HYDRADB_SUB_TENANT_ID=""
 ```
 
-### Common optional environment variables
+### Common additional environment variables
 
 ```bash
 export HYDRADB_SUB_TENANT_ID="claude-shared-workspace"
@@ -130,7 +131,7 @@ export HYDRADB_USER_NAME="Soham"
 export HYDRADB_PLUGIN_CONFIG="/absolute/path/to/config.json"
 export HYDRADB_BASE_URL="https://api.hydradb.com"
 export HYDRADB_RECALL_MODE="thinking"
-export HYDRADB_CAPTURE_MODE="turn"
+export HYDRADB_CAPTURE_MODE="session-upsert"
 export HYDRADB_SEARCH_MODE="memory"
 export HYDRADB_INGESTION_MODE="memory"
 export HYDRADB_AUTO_RECALL="true"
@@ -152,7 +153,7 @@ See [config.example.json](./config.example.json) for the full shape and [.hydrad
   "apiBaseUrl": "https://api.hydradb.com",
   "autoRecall": true,
   "autoIngest": true,
-  "captureMode": "turn",
+  "captureMode": "session-upsert",
   "searchMode": "memory",
   "ingestionMode": "memory",
   "recallMode": "thinking",

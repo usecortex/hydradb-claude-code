@@ -42,7 +42,7 @@ export const DEFAULTS = {
   apiBaseUrl: "https://api.hydradb.com",
   autoRecall: true,
   autoIngest: true,
-  captureMode: "turn",
+  captureMode: "session-upsert",
   searchMode: "memory",
   ingestionMode: "memory",
   recallMode: "fast",
@@ -201,14 +201,6 @@ function parseMode(value, fallback, errors, label, allowed) {
   return value;
 }
 
-function sanitizeSegment(value) {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9_-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48) || "workspace";
-}
-
 async function findProjectRoot(startDir) {
   let current = path.resolve(startDir);
 
@@ -333,14 +325,19 @@ export async function loadConfig(cwd, dataDir) {
     )
   };
 
-  merged = applyKnownKeys(
-    merged,
-    Object.fromEntries(
-      Object.entries(envOverrides).filter(([, value]) => value != null && value !== "")
-    ),
-    "environment",
-    errors
+  const filteredEnvOverrides = Object.fromEntries(
+    Object.entries(envOverrides).filter(([key, value]) => {
+      if (value == null) {
+        return false;
+      }
+      if (key === "subTenantId") {
+        return true;
+      }
+      return value !== "";
+    })
   );
+
+  merged = applyKnownKeys(merged, filteredEnvOverrides, "environment", errors);
 
   const derivedCaptureMode =
     typeof merged.captureMode === "string"
@@ -348,6 +345,7 @@ export async function loadConfig(cwd, dataDir) {
       : merged.autoCapture === false
         ? "off"
         : DEFAULTS.captureMode;
+  const hasExplicitSubTenantId = typeof merged.subTenantId === "string";
 
   const config = {
     apiBaseUrl:
@@ -356,10 +354,7 @@ export async function loadConfig(cwd, dataDir) {
         : DEFAULTS.apiBaseUrl,
     apiKey: typeof merged.apiKey === "string" && merged.apiKey ? merged.apiKey : "",
     tenantId: typeof merged.tenantId === "string" && merged.tenantId ? merged.tenantId : "",
-    subTenantId:
-      typeof merged.subTenantId === "string" && merged.subTenantId
-        ? merged.subTenantId
-        : `claude-${sanitizeSegment(workspaceName)}`,
+    subTenantId: hasExplicitSubTenantId ? merged.subTenantId : "",
     userName: typeof merged.userName === "string" ? merged.userName : "",
     autoRecall: parseBoolean(merged.autoRecall, DEFAULTS.autoRecall, errors, "autoRecall"),
     autoIngest: parseBoolean(merged.autoIngest, DEFAULTS.autoIngest, errors, "autoIngest"),
@@ -476,6 +471,10 @@ export async function loadConfig(cwd, dataDir) {
         : ""
   };
 
+  if (!hasExplicitSubTenantId) {
+    errors.push('subTenantId must be set explicitly. Use "" if you want HydraDB\'s default sub-tenant.');
+  }
+
   if (config.autoIngest) {
     if (config.ingestionMode === "memory" && config.searchMode === "knowledge") {
       errors.push(
@@ -497,7 +496,7 @@ export async function loadConfig(cwd, dataDir) {
   }
 
   return {
-    configured: Boolean(config.apiKey && config.tenantId),
+    configured: Boolean(config.apiKey && config.tenantId && hasExplicitSubTenantId),
     config,
     projectRoot,
     workspaceName,

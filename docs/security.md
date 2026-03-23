@@ -52,7 +52,7 @@ For most teams, this is the safest high-automation starting point:
 
 ```json
 {
-  "captureMode": "turn",
+  "captureMode": "session-upsert",
   "searchMode": "memory",
   "ingestionMode": "memory",
   "includeGlobs": [

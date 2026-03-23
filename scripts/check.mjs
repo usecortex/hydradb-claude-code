@@ -88,6 +88,29 @@ assert.equal(lastRecall.sessionId, "check-session");
 assert.equal(lastRecall.skipped, true);
 assert.equal(lastRecall.reason, "not-configured");
 
+await fs.writeFile(
+  path.join(tempDataDir, "config.json"),
+  JSON.stringify(
+    {
+      apiKey: "test-key",
+      tenantId: "tenant-123",
+      subTenantId: ""
+    },
+    null,
+    2
+  ),
+  "utf8"
+);
+
+const statusRaw = execFileSync(process.execPath, [path.join(root, "scripts/plugin.mjs"), "status", "--json"], {
+  env: baseEnv,
+  encoding: "utf8"
+}).trim();
+const status = JSON.parse(statusRaw);
+assert.equal(status.configured, true);
+assert.equal(status.resolvedConfig.subTenantId, "");
+assert.equal(status.resolvedConfig.captureMode, "session-upsert");
+
 process.stdout.write(
-  `Validated ${scriptFiles.length} core scripts, ${jsonFiles.length} JSON files, recall normalization, hook output, and last-recall state.\n`
+  `Validated ${scriptFiles.length} core scripts, ${jsonFiles.length} JSON files, recall normalization, hook output, last-recall state, and config defaults.\n`
 );

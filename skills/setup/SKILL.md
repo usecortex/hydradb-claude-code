@@ -28,6 +28,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/plugin.mjs" status --json
   "apiBaseUrl": "https://api.hydradb.com",
   "apiKey": "${HYDRADB_API_KEY}",
   "tenantId": "${HYDRADB_TENANT_ID}",
+  "subTenantId": "",
   "autoRecall": true,
   "autoIngest": true,
   "captureMode": "off",
@@ -45,7 +46,7 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/plugin.mjs" status --json
 5. Never invent secrets. Prefer environment variables for secret values:
    - `HYDRADB_API_KEY`
    - `HYDRADB_TENANT_ID`
-   - optional `HYDRADB_SUB_TENANT_ID`
+   - `HYDRADB_SUB_TENANT_ID` (set it explicitly; `""` is valid if you want HydraDB's default sub-tenant)
    - optional `HYDRADB_BASE_URL`
    - optional `HYDRADB_USER_NAME`
 

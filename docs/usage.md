@@ -9,6 +9,7 @@ At minimum, provide:
 ```bash
 export HYDRADB_API_KEY="..."
 export HYDRADB_TENANT_ID="tenant_123"
+export HYDRADB_SUB_TENANT_ID=""
 ```
 
 Then add a workspace config if you want repo-specific behavior:
@@ -16,7 +17,7 @@ Then add a workspace config if you want repo-specific behavior:
 ```json
 {
   "subTenantId": "claude-my-workspace",
-  "captureMode": "turn",
+  "captureMode": "session-upsert",
   "searchMode": "memory",
   "ingestionMode": "memory",
   "requestTimeoutMs": 15000,
@@ -34,6 +35,8 @@ The plugin reads config from:
 6. `.hydradb-plugin.local.json`
 7. environment variable overrides
 
+`subTenantId` is required explicitly. If you want HydraDB to use its default sub-tenant, set `subTenantId` to `""` instead of leaving it out.
+
 ## 2. Pick your automation level
 
 ### Default mode
@@ -42,7 +45,7 @@ The plugin reads config from:
 {
   "autoRecall": true,
   "autoIngest": true,
-  "captureMode": "turn",
+  "captureMode": "session-upsert",
   "searchMode": "memory",
   "ingestionMode": "memory"
 }
@@ -52,7 +55,7 @@ Use this when you want:
 
 - markdown docs synced into HydraDB memory with `infer`
 - prompt-time recall from memory by default
-- isolated user/assistant turn capture instead of whole-session snapshots
+- one evolving session memory by default instead of isolated turn snapshots
 
 ### Rolling full-session mode
 
@@ -203,7 +206,7 @@ This content is explicitly framed as reference material, not as new instructions
 
 ```json
 {
-  "captureMode": "turn",
+  "captureMode": "session-upsert",
   "searchMode": "memory",
   "ingestionMode": "memory"
 }
