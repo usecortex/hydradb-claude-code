@@ -34,6 +34,33 @@ If you publish the GitHub repo, users can add the marketplace and install the pl
 
 For npm distribution, the package name is `hydradb-claude-plugin`. Run `npm pack --dry-run` before publishing to confirm the packaged files.
 
+### Public GitHub marketplace flow
+
+Once the GitHub repo is public at `usecortex/hydradb-claude-code`, users can install it directly in Claude Code:
+
+```text
+/plugin marketplace add usecortex/hydradb-claude-code
+/plugin install hydradb@hydradb
+```
+
+Then restart Claude Code or run:
+
+```text
+/reload-plugins
+```
+
+If you are testing from a local checkout before publishing, add the absolute local path instead of the GitHub repo path.
+
+### Release checklist
+
+For a GitHub-backed release:
+
+1. push `main` to `usecortex/hydradb-claude-code`
+2. tag the release, for example `v1.0.0`
+3. confirm public Claude install with `/plugin marketplace add usecortex/hydradb-claude-code`
+4. optionally publish the npm package
+5. optionally submit to Anthropic's official marketplace after the GitHub flow works
+
 ## What ships
 
 - `SessionStart` hook that announces HydraDB status and starts an async sync
@@ -258,6 +285,12 @@ Validate the plugin:
 
 ```bash
 npm run check
+```
+
+If your global npm cache has permission issues, use:
+
+```bash
+npm_config_cache=/tmp/hydradb-npm-cache npm pack --dry-run
 ```
 
 Load it into Claude Code using the local plugin development flow supported by your installed Claude Code version. If your build supports `--plugin-dir`, you can use:

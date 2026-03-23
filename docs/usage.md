@@ -2,6 +2,28 @@
 
 This guide covers the day-to-day setup and operating modes for the HydraDB Claude Code plugin.
 
+## Install paths
+
+### Public GitHub install
+
+After the repo is public, install it in Claude Code with:
+
+```text
+/plugin marketplace add usecortex/hydradb-claude-code
+/plugin install hydradb@hydradb
+```
+
+Then reload or restart Claude Code.
+
+### Local checkout install
+
+If you are testing the plugin from source before publishing, add the absolute path to the repo:
+
+```text
+/plugin marketplace add /absolute/path/to/hydradb-claude-code
+/plugin install hydradb@hydradb
+```
+
 ## 1. Configure HydraDB
 
 At minimum, provide:
