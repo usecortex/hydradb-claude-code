@@ -25,3 +25,7 @@ Summarize:
 - any config validation errors
 
 If configuration is missing or broken, point the user to `/hydradb:setup`. If `captureMode` is `off`, mention that manual session saving is available via `/hydradb:save-session`.
+
+If the user is specifically debugging prompt-time recall, point them to `/hydradb:last-recall`.
+
+Do not infer that `UserPromptSubmit` hooks failed or that no HydraDB context was injected based on status output alone. Status only reports configuration and tracked state; use `/hydradb:last-recall` for prompt-time recall evidence.

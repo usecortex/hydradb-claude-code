@@ -66,3 +66,5 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/plugin.mjs" status
 11. The default workspace sync target should usually be `ingestionMode: "memory"`, with markdown-first `includeGlobs`. Only recommend `knowledge` or `both` recall if the user understands the tradeoff.
 
 12. If HydraDB feels slow or the user wants tighter hook budgets, suggest lowering `requestTimeoutMs` and `writeTimeoutMs`, or setting `HYDRADB_REQUEST_TIMEOUT_MS` and `HYDRADB_WRITE_TIMEOUT_MS`.
+
+13. If the plugin is configured but the user is unsure whether prompt-time recall actually ran, suggest `/hydradb:last-recall`. Do not claim that no context was injected unless that command or explicit recall output confirms it.

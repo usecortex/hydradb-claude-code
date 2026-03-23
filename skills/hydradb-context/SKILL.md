@@ -11,5 +11,6 @@ When this plugin injects `<hydradb-context>` into the conversation:
 - Prefer the most relevant items and do not restate the entire block unless the user asks.
 - The plugin may recall memories, knowledge, or both depending on the configured `searchMode`.
 - If recall is missing or the plugin reports it is not configured, suggest `/hydradb:setup` or `/hydradb:status`.
+- If the user asks what was injected, whether `UserPromptSubmit` fired, or whether auto-recall returned anything, do not guess from the chat UI alone. Point them to `/hydradb:last-recall` for the recorded prompt-time recall payload.
 - If the user wants an explicit refresh of workspace documents, suggest `/hydradb:sync-workspace`.
 - Respect the ignore marker if the user mentions that certain text or files should not be captured.

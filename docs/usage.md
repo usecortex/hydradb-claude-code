@@ -173,12 +173,17 @@ Important: the ignore marker skips capture and sync. It does not disable recall 
 
 - `/hydradb:setup`
 - `/hydradb:status`
+- `/hydradb:last-recall`
 - `/hydradb:search <query>`
 - `/hydradb:remember <note>`
 - `/hydradb:save-session`
 - `/hydradb:sync-workspace [--force]`
 
 The plugin also exposes CLI entry points through `node scripts/plugin.mjs` for local testing.
+
+If auto-recall feels unclear, run `/hydradb:last-recall` to inspect the most recent prompt-time recall payload the plugin recorded.
+
+For deeper hook debugging, start Claude Code with `HYDRADB_DEBUG=true`. The plugin will keep a best-effort JSONL trace in `${CLAUDE_PLUGIN_DATA}/debug.log` or `./.hydradb-plugin-data/debug.log`.
 
 ## 8. What auto recall injects
 

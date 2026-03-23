@@ -5,7 +5,8 @@ const DEFAULT_STATE = {
   version: 1,
   files: {},
   sessions: {},
-  lastSessionId: ""
+  lastSessionId: "",
+  lastRecall: null
 };
 
 function cloneDefaultState() {
@@ -118,7 +119,8 @@ export async function readState(dataDir) {
       ...parsed,
       files: parsed.files && typeof parsed.files === "object" ? parsed.files : {},
       sessions: parsed.sessions && typeof parsed.sessions === "object" ? parsed.sessions : {},
-      lastSessionId: typeof parsed.lastSessionId === "string" ? parsed.lastSessionId : ""
+      lastSessionId: typeof parsed.lastSessionId === "string" ? parsed.lastSessionId : "",
+      lastRecall: parsed.lastRecall && typeof parsed.lastRecall === "object" ? parsed.lastRecall : null
     };
   } catch (error) {
     if (error && error.code === "ENOENT") {

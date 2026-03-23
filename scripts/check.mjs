@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 import { normalizeRetrievalResponse } from "./lib/hydra-client.mjs";
@@ -51,6 +52,42 @@ assert.equal(normalizedRecall.chunks.length, 1);
 assert.equal(normalizedRecall.chunks[0].text, "HydraDB plugin overview");
 assert.equal(normalizedRecall.chunks[0].sourceTitle, "README.md");
 
+const tempDataDir = await fs.mkdtemp(path.join(os.tmpdir(), "hydradb-plugin-check-"));
+const baseEnv = {
+  ...process.env,
+  CLAUDE_PLUGIN_DATA: tempDataDir
+};
+
+const sessionStartRaw = execFileSync(process.execPath, [path.join(root, "scripts/plugin.mjs"), "session-start"], {
+  env: baseEnv,
+  encoding: "utf8"
+}).trim();
+const sessionStartOutput = JSON.parse(sessionStartRaw);
+assert.equal(sessionStartOutput.hookSpecificOutput?.hookEventName, "SessionStart");
+assert.match(sessionStartOutput.hookSpecificOutput?.additionalContext || "", /<hydradb-status>/);
+
+execFileSync(process.execPath, [path.join(root, "scripts/plugin.mjs"), "user-prompt-submit"], {
+  env: baseEnv,
+  input: JSON.stringify({
+    session_id: "check-session",
+    prompt: "what is hydradb plugin"
+  }),
+  encoding: "utf8"
+});
+
+const lastRecallRaw = execFileSync(
+  process.execPath,
+  [path.join(root, "scripts/plugin.mjs"), "last-recall", "--json"],
+  {
+    env: baseEnv,
+    encoding: "utf8"
+  }
+).trim();
+const lastRecall = JSON.parse(lastRecallRaw);
+assert.equal(lastRecall.sessionId, "check-session");
+assert.equal(lastRecall.skipped, true);
+assert.equal(lastRecall.reason, "not-configured");
+
 process.stdout.write(
-  `Validated ${scriptFiles.length} core scripts, ${jsonFiles.length} JSON files, and recall normalization.\n`
+  `Validated ${scriptFiles.length} core scripts, ${jsonFiles.length} JSON files, recall normalization, hook output, and last-recall state.\n`
 );

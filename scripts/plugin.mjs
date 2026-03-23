@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import crypto from "node:crypto";
+import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 
@@ -21,6 +22,36 @@ function fallbackDataDir(cwd) {
 
 function emitJson(value) {
   process.stdout.write(`${JSON.stringify(value)}\n`);
+}
+
+function emitHookContext(hookEventName, additionalContext) {
+  emitJson({
+    hookSpecificOutput: {
+      hookEventName,
+      additionalContext
+    }
+  });
+}
+
+async function appendDebugLog(dataDir, enabled, event, payload) {
+  if (!enabled) {
+    return;
+  }
+
+  try {
+    await fs.mkdir(dataDir, { recursive: true });
+    await fs.appendFile(
+      path.join(dataDir, "debug.log"),
+      `${JSON.stringify({
+        timestamp: new Date().toISOString(),
+        event,
+        payload
+      })}\n`,
+      "utf8"
+    );
+  } catch {
+    // Best-effort logging only.
+  }
 }
 
 async function readStdinJson() {
@@ -231,7 +262,7 @@ async function autoUpsertSession({ client, configResult, sessionId, session }) {
 
 async function handleSessionStart() {
   const runtime = await getRuntime();
-  const { configResult } = runtime;
+  const { configResult, dataDir } = runtime;
   const lines = ["<hydradb-status>"];
 
   if (!configResult.configured) {
@@ -258,7 +289,13 @@ async function handleSessionStart() {
   }
 
   lines.push("</hydradb-status>");
-  emitJson({ additionalContext: lines.join("\n") });
+  const additionalContext = lines.join("\n");
+  await appendDebugLog(dataDir, configResult.config.debug, "session-start", {
+    configured: configResult.configured,
+    emitted: true,
+    errorCount: configResult.errors.length
+  });
+  emitHookContext("SessionStart", additionalContext);
 }
 
 async function handleSessionSyncHook() {
@@ -292,6 +329,15 @@ async function handleUserPromptSubmit() {
     configResult.config.ignoreMarker && rawPrompt.includes(configResult.config.ignoreMarker)
   );
   const skipCapture = !rawPrompt || isSlashCommand || hasIgnoreMarker || !prompt;
+  const skipReason = !rawPrompt
+    ? "empty-prompt"
+    : isSlashCommand
+      ? "slash-command"
+      : hasIgnoreMarker
+        ? "ignore-marker"
+        : !prompt
+          ? "empty-after-redaction"
+          : "";
 
   session.pendingPrompt = skipCapture ? "" : prompt;
   session.pendingPromptUpdatedAt = now;
@@ -300,10 +346,38 @@ async function handleUserPromptSubmit() {
   await writeState(dataDir, state);
 
   if (!client || !configResult.config.autoRecall) {
+    state.lastRecall = {
+      sessionId: input.session_id || "unknown",
+      query: prompt || rawPrompt,
+      searchMode: configResult.config.searchMode,
+      skipped: true,
+      reason: client ? "auto-recall-disabled" : "not-configured",
+      updatedAt: now
+    };
+    await writeState(dataDir, state);
+    await appendDebugLog(dataDir, configResult.config.debug, "user-prompt-submit", {
+      sessionId: input.session_id || "unknown",
+      skipped: true,
+      reason: client ? "auto-recall-disabled" : "not-configured"
+    });
     return;
   }
 
   if (!rawPrompt || isSlashCommand || !prompt) {
+    state.lastRecall = {
+      sessionId: input.session_id || "unknown",
+      query: prompt || rawPrompt,
+      searchMode: configResult.config.searchMode,
+      skipped: true,
+      reason: skipReason,
+      updatedAt: now
+    };
+    await writeState(dataDir, state);
+    await appendDebugLog(dataDir, configResult.config.debug, "user-prompt-submit", {
+      sessionId: input.session_id || "unknown",
+      skipped: true,
+      reason: skipReason
+    });
     return;
   }
 
@@ -317,8 +391,38 @@ async function handleUserPromptSubmit() {
     maxContextChars: configResult.config.maxContextChars
   });
 
+  state.lastRecall = {
+    sessionId: input.session_id || "unknown",
+    query: prompt,
+    searchMode: recall.searchMode,
+    skipped: false,
+    emitted: Boolean(additionalContext),
+    memoryCount: recall.memory.chunks.length,
+    knowledgeCount: recall.knowledge.chunks.length,
+    memoryGraphPathCount:
+      recall.memory.graphContext?.queryPathsDetailed?.length || recall.memory.queryPaths.length,
+    knowledgeGraphPathCount:
+      recall.knowledge.graphContext?.queryPathsDetailed?.length || recall.knowledge.queryPaths.length,
+    errors: recall.errors,
+    additionalContext,
+    updatedAt: now
+  };
+  if (configResult.config.debug) {
+    state.lastRecall.memory = recall.memory;
+    state.lastRecall.knowledge = recall.knowledge;
+  }
+  await writeState(dataDir, state);
+  await appendDebugLog(dataDir, configResult.config.debug, "user-prompt-submit", {
+    sessionId: input.session_id || "unknown",
+    query: prompt,
+    emitted: Boolean(additionalContext),
+    memoryCount: recall.memory.chunks.length,
+    knowledgeCount: recall.knowledge.chunks.length,
+    errorCount: recall.errors.length
+  });
+
   if (additionalContext) {
-    emitJson({ additionalContext });
+    emitHookContext("UserPromptSubmit", additionalContext);
   }
 }
 
@@ -425,6 +529,7 @@ function usage() {
       "  node scripts/plugin.mjs post-tool-use",
       "  node scripts/plugin.mjs stop",
       "  node scripts/plugin.mjs status [--json]",
+      "  node scripts/plugin.mjs last-recall [--json]",
       "  node scripts/plugin.mjs remember <text>",
       "  node scripts/plugin.mjs save-session [--json] [session-id]",
       "  node scripts/plugin.mjs search [--json] <query>",
@@ -471,6 +576,49 @@ async function handleStatus(args) {
     return;
   }
   process.stdout.write(`${formatStatusText(summary)}\n`);
+}
+
+function formatLastRecallText(lastRecall) {
+  const lines = [
+    `sessionId: ${lastRecall.sessionId || "unknown"}`,
+    `updatedAt: ${lastRecall.updatedAt || "(unknown)"}`,
+    `searchMode: ${lastRecall.searchMode || "(unknown)"}`,
+    `skipped: ${Boolean(lastRecall.skipped)}`
+  ];
+
+  if (lastRecall.skipped) {
+    lines.push(`reason: ${lastRecall.reason || "unknown"}`);
+    return lines.join("\n");
+  }
+
+  lines.push(`emitted: ${Boolean(lastRecall.emitted)}`);
+  lines.push(`memoryCount: ${lastRecall.memoryCount ?? 0}`);
+  lines.push(`knowledgeCount: ${lastRecall.knowledgeCount ?? 0}`);
+  lines.push(
+    `memoryGraphPathCount: ${lastRecall.memoryGraphPathCount ?? 0}`
+  );
+  lines.push(
+    `knowledgeGraphPathCount: ${lastRecall.knowledgeGraphPathCount ?? 0}`
+  );
+  lines.push(lastRecall.errors?.length ? `errors: ${lastRecall.errors.join(" | ")}` : "errors: none");
+  return lines.join("\n");
+}
+
+async function handleLastRecall(args) {
+  const jsonMode = args.includes("--json");
+  const runtime = await getRuntime();
+  const lastRecall = runtime.state.lastRecall;
+
+  if (!lastRecall) {
+    throw new Error("no auto-recall payload has been recorded yet");
+  }
+
+  if (jsonMode) {
+    emitJson(lastRecall);
+    return;
+  }
+
+  process.stdout.write(`${formatLastRecallText(lastRecall)}\n`);
 }
 
 async function handleRemember(args) {
@@ -682,6 +830,9 @@ async function main() {
       return;
     case "status":
       await handleStatus(args);
+      return;
+    case "last-recall":
+      await handleLastRecall(args);
       return;
     case "remember":
       await handleRemember(args);

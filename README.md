@@ -186,12 +186,15 @@ See [docs/security.md](./docs/security.md) for the fuller bug/security note, rem
 
 - `/hydradb:setup`
 - `/hydradb:status`
+- `/hydradb:last-recall`
 - `/hydradb:search <query>`
 - `/hydradb:remember <note>`
 - `/hydradb:save-session`
 - `/hydradb:sync-workspace [--force]`
 
 The plugin also includes a hidden `hydradb-context` skill that tells Claude how to interpret injected HydraDB context blocks.
+
+For debugging prompt-time recall, use `/hydradb:last-recall` to inspect the most recent auto-recall payload the plugin recorded.
 
 ## Manual and low-automation modes
 
@@ -248,6 +251,14 @@ claude update
 ```
 
 After edits, run `/reload-plugins` inside Claude Code.
+
+For prompt-time debugging, run Claude Code with:
+
+```bash
+HYDRADB_DEBUG=true claude --plugin-dir .
+```
+
+Then use `/hydradb:last-recall` to inspect the most recent auto-recall payload. When debug mode is enabled, the plugin also writes best-effort hook traces to `${CLAUDE_PLUGIN_DATA}/debug.log` or `./.hydradb-plugin-data/debug.log`.
 
 ## Known limits
 
