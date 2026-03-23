@@ -8,8 +8,8 @@
     {
       "name": "hydradb",
       "source": {
-        "source": "github",
-        "repo": "usecortex/hydradb-claude-code"
+        "source": "git",
+        "url": "https://github.com/usecortex/hydradb-claude-code.git"
       },
       "description": "Secure HydraDB automation for Claude Code with workspace sync, prompt recall, and conversation capture.",
       "version": "1.0.0",
