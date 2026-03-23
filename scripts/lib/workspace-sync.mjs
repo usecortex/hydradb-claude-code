@@ -407,7 +407,8 @@ export async function syncWorkspace({
       });
       stagedByPath.set(filePath, {
         relPath: details.relPath,
-        target
+        target,
+        chunkCount
       });
     } catch (error) {
       summary.errors.push(`${filePath}: ${error.message}`);
@@ -446,13 +447,18 @@ export async function syncWorkspace({
       const wasDeleted = !scannedPaths.has(filePath);
       const ineligible = ineligibleByPath.get(filePath);
       const stagedEntry = stagedByPath.get(filePath);
-      const nextChunkCount = staged.find((file) => file.filePath === filePath)?.chunkCount ?? 0;
 
       if (previous?.target === "memory") {
         const movedAwayFromMemory = stagedEntry && stagedEntry.target !== "memory";
+        const isUnchangedMemory =
+          !wasDeleted && !ineligible && (!stagedEntry || stagedEntry.target === "memory");
+        if (isUnchangedMemory && !stagedEntry) {
+          continue;
+        }
+
         const currentMemoryIds =
           stagedEntry?.target === "memory"
-            ? new Set(memorySourceIds(projectRoot, previous.relPath, nextChunkCount))
+            ? new Set(memorySourceIds(projectRoot, previous.relPath, stagedEntry.chunkCount))
             : new Set();
         const previousMemoryIds = memorySourceIds(
           projectRoot,

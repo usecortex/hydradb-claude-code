@@ -388,6 +388,16 @@ async function handleUserPromptSubmit() {
   state.lastSessionId = input.session_id || "unknown";
   await writeState(dataDir, state);
 
+  if (isSlashCommand) {
+    await appendDebugLog(dataDir, configResult.config.debug, "user-prompt-submit", {
+      sessionId: input.session_id || "unknown",
+      skipped: true,
+      reason: skipReason,
+      preservedLastRecall: Boolean(state.lastRecall)
+    });
+    return;
+  }
+
   if (!client || !configResult.config.autoRecall) {
     state.lastRecall = {
       sessionId: input.session_id || "unknown",
@@ -406,7 +416,7 @@ async function handleUserPromptSubmit() {
     return;
   }
 
-  if (!rawPrompt || isSlashCommand || !prompt) {
+  if (!rawPrompt || !prompt) {
     state.lastRecall = {
       sessionId: input.session_id || "unknown",
       query: prompt || rawPrompt,

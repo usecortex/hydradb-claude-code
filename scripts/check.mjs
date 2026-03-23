@@ -7,6 +7,7 @@ import os from "node:os";
 import path from "node:path";
 
 import { normalizeRetrievalResponse } from "./lib/hydra-client.mjs";
+import { syncWorkspace } from "./lib/workspace-sync.mjs";
 
 const root = process.cwd();
 
@@ -163,6 +164,96 @@ const inlineStatusRaw = execFileSync(
 const inlineStatus = JSON.parse(inlineStatusRaw);
 assert.equal(inlineStatus.configured, true);
 assert.equal(inlineStatus.dataDir, inlineDataDir);
+
+const preservedRecallDir = await fs.mkdtemp(path.join(os.tmpdir(), "hydradb-plugin-last-recall-"));
+await fs.writeFile(
+  path.join(preservedRecallDir, "state.json"),
+  JSON.stringify(
+    {
+      version: 1,
+      files: {},
+      sessions: {},
+      lastSessionId: "existing-session",
+      lastRecall: {
+        sessionId: "existing-session",
+        query: "persisted query",
+        searchMode: "memory",
+        skipped: false,
+        emitted: true,
+        memoryCount: 2,
+        knowledgeCount: 0,
+        updatedAt: "2026-03-23T00:00:00.000Z"
+      }
+    },
+    null,
+    2
+  ),
+  "utf8"
+);
+execFileSync(process.execPath, [path.join(root, "scripts/plugin.mjs"), "user-prompt-submit"], {
+  env: {
+    ...process.env,
+    CLAUDE_PLUGIN_DATA: preservedRecallDir
+  },
+  input: JSON.stringify({
+    session_id: "existing-session",
+    prompt: "/hydradb:last-recall"
+  }),
+  encoding: "utf8"
+});
+const preservedLastRecall = JSON.parse(
+  await fs.readFile(path.join(preservedRecallDir, "state.json"), "utf8")
+).lastRecall;
+assert.equal(preservedLastRecall.query, "persisted query");
+
+const syncProjectDir = await fs.mkdtemp(path.join(os.tmpdir(), "hydradb-plugin-sync-"));
+const syncDocPath = path.join(syncProjectDir, "CLAUDE.md");
+await fs.writeFile(syncDocPath, "# HydraDB\n", "utf8");
+const unchangedState = {
+  files: {
+    [syncDocPath]: {
+      digest: "unused-digest",
+      relPath: "CLAUDE.md",
+      syncedAt: "2026-03-23T00:00:00.000Z",
+      target: "memory",
+      chunkCount: 1
+    }
+  },
+  sessions: {},
+  lastSessionId: "",
+  lastRecall: null
+};
+const syncCalls = [];
+await syncWorkspace({
+  client: {
+    tenantId: "tenant-123",
+    subTenantId: "",
+    addMemories: async () => {},
+    uploadKnowledge: async () => {},
+    deleteKnowledge: async (ids) => {
+      syncCalls.push({ type: "knowledge", ids });
+    },
+    deleteMemories: async (ids) => {
+      syncCalls.push({ type: "memory", ids });
+    }
+  },
+  config: {
+    includeGlobs: ["CLAUDE.md"],
+    excludeGlobs: [],
+    maxFileSizeBytes: 50 * 1024 * 1024,
+    maxFilesPerSync: 25,
+    maxMemoryCharsPerChunk: 50 * 1024 * 1024,
+    maxMemoryChunksPerFile: 1,
+    ingestionMode: "memory",
+    writeTimeoutMs: 15000,
+    userName: "",
+    workspaceMemoryCustomInstructions: ""
+  },
+  projectRoot: syncProjectDir,
+  workspaceName: "sync-check",
+  state: unchangedState
+});
+assert.equal(syncCalls.length, 0);
 
 process.stdout.write(
   `Validated ${scriptFiles.length} core scripts, ${jsonFiles.length} JSON files, recall normalization, hook output, last-recall state, and config defaults.\n`
