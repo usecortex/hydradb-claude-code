@@ -33,9 +33,24 @@ for (const relativePath of scriptFiles) {
   });
 }
 
+execFileSync("bash", ["-n", path.join(root, "scripts/run-plugin.sh")], {
+  stdio: "inherit"
+});
+
 for (const relativePath of jsonFiles) {
   const raw = await fs.readFile(path.join(root, relativePath), "utf8");
   JSON.parse(raw);
+}
+
+const hookConfig = JSON.parse(await fs.readFile(path.join(root, "hooks/hooks.json"), "utf8"));
+for (const hookName of ["SessionStart", "UserPromptSubmit", "PostToolUse", "Stop"]) {
+  const entries = hookConfig.hooks?.[hookName] || [];
+  assert.ok(entries.length > 0, `${hookName} should be configured`);
+  const commands = entries.flatMap((entry) => entry.hooks || []).map((hook) => hook.command || "");
+  assert.ok(
+    commands.some((command) => command.includes("scripts/run-plugin.sh")),
+    `${hookName} should use the hook runner wrapper`
+  );
 }
 
 const normalizedRecall = normalizeRetrievalResponse({

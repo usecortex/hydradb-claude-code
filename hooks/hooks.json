@@ -5,12 +5,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/plugin.mjs\" session-start",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/run-plugin.sh\" session-start",
             "timeout": 15
           },
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/plugin.mjs\" session-sync-hook",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/run-plugin.sh\" session-sync-hook",
             "async": true,
             "timeout": 120
           }
@@ -22,7 +22,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/plugin.mjs\" user-prompt-submit",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/run-plugin.sh\" user-prompt-submit",
             "timeout": 20
           }
         ]
@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/plugin.mjs\" post-tool-use",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/run-plugin.sh\" post-tool-use",
             "async": true,
             "timeout": 120
           }
@@ -46,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"${CLAUDE_PLUGIN_ROOT}/scripts/plugin.mjs\" stop",
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/scripts/run-plugin.sh\" stop",
             "timeout": 20
           }
         ]

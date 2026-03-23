@@ -24,6 +24,7 @@ It complements the HydraDB MCP server. The MCP remains useful for direct tool ac
 - `UserPromptSubmit` hook that recalls HydraDB context before Claude answers
 - `PostToolUse` hook that re-syncs changed workspace docs
 - `Stop` hook that buffers sanitized turns and optionally writes them to HydraDB
+- a hidden `auto-recall` skill Claude can invoke proactively when prompt-hook recall is unavailable or insufficient
 - user-facing skills for setup, status, search, remember, full-session save, and forced sync
 
 ## Core model
@@ -89,6 +90,8 @@ Capture is configurable with `captureMode`:
 - skips slash commands for capture
 - recalls according to `searchMode`
 - injects a bounded `<hydradb-context>` block into the prompt
+
+If a Claude Code build does not execute `UserPromptSubmit` reliably, the plugin also ships a hidden model-invocable `auto-recall` skill so Claude can still proactively query HydraDB when answering continuity-sensitive questions.
 
 ### Post-tool use
 
@@ -260,6 +263,8 @@ HYDRADB_DEBUG=true claude --plugin-dir .
 ```
 
 Then use `/hydradb:last-recall` to inspect the most recent auto-recall payload. When debug mode is enabled, the plugin also writes best-effort hook traces to `${CLAUDE_PLUGIN_DATA}/debug.log` or `./.hydradb-plugin-data/debug.log`.
+
+The hook commands use `scripts/run-plugin.sh`, which tries several common Node locations before failing. This avoids depending entirely on Claude's hook PATH matching your interactive shell PATH.
 
 ## Known limits
 
