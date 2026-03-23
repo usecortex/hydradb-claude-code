@@ -9,7 +9,7 @@
       "name": "hydradb",
       "source": {
         "source": "github",
-        "repo": "hydradb/hydradb-claude-plugin"
+        "repo": "usecortex/hydradb-claude-code"
       },
       "description": "Secure HydraDB automation for Claude Code with workspace sync, prompt recall, and conversation capture.",
       "version": "1.0.0",
@@ -19,7 +19,7 @@
         "url": "https://hydradb.com"
       },
       "homepage": "https://docs.hydradb.com/",
-      "repository": "https://github.com/hydradb/hydradb-claude-plugin",
+      "repository": "https://github.com/usecortex/hydradb-claude-code",
       "license": "MIT",
       "keywords": [
         "hydradb",
