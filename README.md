@@ -28,7 +28,7 @@ This repo is ready to ship in two ways:
 If you publish the GitHub repo, users can add the marketplace and install the plugin with:
 
 ```text
-/plugin marketplace add hydradb/hydradb-claude-plugin
+/plugin marketplace add usecortex/hydradb-claude-code
 /plugin install hydradb@hydradb
 ```
 

@@ -7,10 +7,10 @@
   "homepage": "https://docs.hydradb.com/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hydradb/hydradb-claude-plugin.git"
+    "url": "git+https://github.com/usecortex/hydradb-claude-code.git"
   },
   "bugs": {
-    "url": "https://github.com/hydradb/hydradb-claude-plugin/issues"
+    "url": "https://github.com/usecortex/hydradb-claude-code/issues"
   },
   "keywords": [
     "hydradb",
