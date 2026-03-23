@@ -1,9 +1,44 @@
 {
   "name": "hydradb-claude-plugin",
   "version": "1.0.0",
-  "private": true,
+  "description": "Secure HydraDB automation for Claude Code with workspace sync, prompt recall, and conversation capture.",
+  "author": "HydraDB <support@hydradb.com>",
+  "license": "MIT",
+  "homepage": "https://docs.hydradb.com/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hydradb/hydradb-claude-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hydradb/hydradb-claude-plugin/issues"
+  },
+  "keywords": [
+    "hydradb",
+    "memory",
+    "retrieval",
+    "claude-code",
+    "knowledge-base"
+  ],
   "type": "module",
+  "files": [
+    ".claude-plugin",
+    "docs",
+    "hooks",
+    "scripts",
+    "skills",
+    "README.md",
+    "LICENSE",
+    ".hydradb-plugin.json.example",
+    "config.example.json"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
-    "check": "node scripts/check.mjs"
+    "check": "node scripts/check.mjs",
+    "pack:dry-run": "npm pack --dry-run"
   }
 }

@@ -2,6 +2,7 @@
 
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 import process from "node:process";
 
@@ -16,8 +17,50 @@ import { redactSecrets, wasRedacted } from "./lib/sanitize.mjs";
 import { readState, writeState } from "./lib/state.mjs";
 import { extractPathsFromToolInput, syncWorkspace } from "./lib/workspace-sync.mjs";
 
-function fallbackDataDir(cwd) {
-  return process.env.CLAUDE_PLUGIN_DATA || path.join(cwd, ".hydradb-plugin-data");
+async function pathExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function inferInlinePluginDataDir() {
+  const pluginRoot = process.env.CLAUDE_PLUGIN_ROOT;
+  if (!pluginRoot) {
+    return "";
+  }
+
+  try {
+    const manifestPath = path.join(pluginRoot, ".claude-plugin", "plugin.json");
+    const manifest = JSON.parse(await fs.readFile(manifestPath, "utf8"));
+    const pluginName =
+      manifest && typeof manifest.name === "string" && manifest.name.trim()
+        ? manifest.name.trim()
+        : "";
+    if (!pluginName) {
+      return "";
+    }
+
+    const dataDir = path.join(os.homedir(), ".claude", "plugins", "data", `${pluginName}-inline`);
+    return (await pathExists(dataDir)) ? dataDir : "";
+  } catch {
+    return "";
+  }
+}
+
+async function fallbackDataDir(cwd) {
+  if (process.env.CLAUDE_PLUGIN_DATA) {
+    return process.env.CLAUDE_PLUGIN_DATA;
+  }
+
+  const inlineDataDir = await inferInlinePluginDataDir();
+  if (inlineDataDir) {
+    return inlineDataDir;
+  }
+
+  return path.join(cwd, ".hydradb-plugin-data");
 }
 
 function emitJson(value) {
@@ -101,7 +144,7 @@ function digest(value) {
 
 async function getRuntime() {
   const cwd = process.cwd();
-  const dataDir = fallbackDataDir(cwd);
+  const dataDir = await fallbackDataDir(cwd);
   const configResult = await loadConfig(cwd, dataDir);
   const state = await readState(dataDir);
   const client = configResult.configured
@@ -544,6 +587,7 @@ function formatStatusText(summary) {
     `configured: ${summary.configured}`,
     `workspace: ${summary.workspaceName}`,
     `projectRoot: ${summary.projectRoot}`,
+    `dataDir: ${summary.dataDir}`,
     `configSources: ${summary.configSources.length ? summary.configSources.join(", ") : "(none)"}`,
     `dataConfigPath: ${summary.dataConfigPath}`,
     `apiBaseUrl: ${summary.resolvedConfig.apiBaseUrl}`,

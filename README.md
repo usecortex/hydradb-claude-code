@@ -18,6 +18,22 @@ It complements the HydraDB MCP server. The MCP remains useful for direct tool ac
 - [Usage guide](./docs/usage.md)
 - [Security and reliability notes](./docs/security.md)
 
+## Distribution
+
+This repo is ready to ship in two ways:
+
+- as a GitHub-backed Claude Code marketplace via [.claude-plugin/marketplace.json](./.claude-plugin/marketplace.json)
+- as a public npm package via [package.json](./package.json)
+
+If you publish the GitHub repo, users can add the marketplace and install the plugin with:
+
+```text
+/plugin marketplace add hydradb/hydradb-claude-plugin
+/plugin install hydradb@hydradb
+```
+
+For npm distribution, the package name is `hydradb-claude-plugin`. Run `npm pack --dry-run` before publishing to confirm the packaged files.
+
 ## What ships
 
 - `SessionStart` hook that announces HydraDB status and starts an async sync

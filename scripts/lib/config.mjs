@@ -508,7 +508,7 @@ export async function loadConfig(cwd, dataDir) {
 }
 
 export function formatStatus(configResult, state) {
-  const { configured, config, projectRoot, workspaceName, dataConfigPath, sources, errors } = configResult;
+  const { configured, config, projectRoot, workspaceName, dataDir, dataConfigPath, sources, errors } = configResult;
   const trackedFiles = Object.keys(state.files ?? {}).length;
   const trackedSessions = Object.keys(state.sessions ?? {}).length;
 
@@ -516,6 +516,7 @@ export function formatStatus(configResult, state) {
     configured,
     workspaceName,
     projectRoot,
+    dataDir,
     dataConfigPath,
     configSources: sources,
     errors,

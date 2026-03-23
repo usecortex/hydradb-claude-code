@@ -22,9 +22,11 @@ const scriptFiles = [
 
 const jsonFiles = [
   ".claude-plugin/plugin.json",
+  ".claude-plugin/marketplace.json",
   "hooks/hooks.json",
   ".hydradb-plugin.json.example",
-  "config.example.json"
+  "config.example.json",
+  "package.json"
 ];
 
 for (const relativePath of scriptFiles) {
@@ -125,6 +127,39 @@ const status = JSON.parse(statusRaw);
 assert.equal(status.configured, true);
 assert.equal(status.resolvedConfig.subTenantId, "");
 assert.equal(status.resolvedConfig.captureMode, "session-upsert");
+
+const tempHome = await fs.mkdtemp(path.join(os.tmpdir(), "hydradb-plugin-home-"));
+const inlineDataDir = path.join(tempHome, ".claude", "plugins", "data", "hydradb-inline");
+await fs.mkdir(inlineDataDir, { recursive: true });
+await fs.writeFile(
+  path.join(inlineDataDir, "config.json"),
+  JSON.stringify(
+    {
+      apiKey: "inline-key",
+      tenantId: "inline-tenant",
+      subTenantId: ""
+    },
+    null,
+    2
+  ),
+  "utf8"
+);
+
+const inlineStatusRaw = execFileSync(
+  process.execPath,
+  [path.join(root, "scripts/plugin.mjs"), "status", "--json"],
+  {
+    env: {
+      ...process.env,
+      HOME: tempHome,
+      CLAUDE_PLUGIN_ROOT: root
+    },
+    encoding: "utf8"
+  }
+).trim();
+const inlineStatus = JSON.parse(inlineStatusRaw);
+assert.equal(inlineStatus.configured, true);
+assert.equal(inlineStatus.dataDir, inlineDataDir);
 
 process.stdout.write(
   `Validated ${scriptFiles.length} core scripts, ${jsonFiles.length} JSON files, recall normalization, hook output, last-recall state, and config defaults.\n`
