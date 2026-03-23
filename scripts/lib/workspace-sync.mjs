@@ -306,9 +306,11 @@ export async function syncWorkspace({
   const summary = {
     scanned: 0,
     synced: 0,
+    deleted: 0,
     skipped: 0,
     errors: [],
     syncedFiles: [],
+    deletedFiles: [],
     skippedFiles: [],
     syncedAs: {
       memory: 0,
@@ -317,9 +319,13 @@ export async function syncWorkspace({
   };
 
   const staged = [];
+  const scannedPaths = new Set();
+  const ineligibleByPath = new Map();
+  const stagedByPath = new Map();
 
   for (const filePath of filesToCheck) {
     summary.scanned += 1;
+    scannedPaths.add(filePath);
 
     try {
       const details = await candidateSummary(filePath, projectRoot, config);
@@ -328,6 +334,7 @@ export async function syncWorkspace({
         if (details.relPath) {
           summary.skippedFiles.push({ path: details.relPath, reason: details.reason });
         }
+        ineligibleByPath.set(filePath, details);
         continue;
       }
 
@@ -347,6 +354,10 @@ export async function syncWorkspace({
         target,
         tenantId: client.tenantId,
         subTenantId: client.subTenantId
+      });
+      stagedByPath.set(filePath, {
+        relPath: details.relPath,
+        target
       });
     } catch (error) {
       summary.errors.push(`${filePath}: ${error.message}`);
@@ -373,6 +384,53 @@ export async function syncWorkspace({
       buildKnowledgeItem(file, projectRoot, workspaceName)
     );
     await client.uploadKnowledge(batch);
+  }
+
+  if (candidatePaths == null) {
+    const knowledgeIdsToDelete = [];
+    const deletedKnowledgePaths = [];
+
+    for (const [filePath, previous] of Object.entries(state.files || {})) {
+      if (previous?.target !== "knowledge") {
+        continue;
+      }
+
+      const wasDeleted = !scannedPaths.has(filePath);
+      const ineligible = ineligibleByPath.get(filePath);
+      const stagedEntry = stagedByPath.get(filePath);
+      const movedAwayFromKnowledge = stagedEntry && stagedEntry.target !== "knowledge";
+
+      if (!wasDeleted && !ineligible && !movedAwayFromKnowledge) {
+        continue;
+      }
+
+      knowledgeIdsToDelete.push(fileSourceId(projectRoot, previous.relPath));
+      deletedKnowledgePaths.push({
+        filePath,
+        relPath: previous.relPath,
+        reason: wasDeleted
+          ? "deleted"
+          : movedAwayFromKnowledge
+            ? "ingestion-target-changed"
+            : ineligible.reason
+      });
+    }
+
+    if (knowledgeIdsToDelete.length) {
+      await client.deleteKnowledge(knowledgeIdsToDelete, {
+        timeoutMs: config.writeTimeoutMs
+      });
+
+      for (const entry of deletedKnowledgePaths) {
+        delete state.files[entry.filePath];
+        summary.deleted += 1;
+        summary.deletedFiles.push({
+          path: entry.relPath,
+          target: "knowledge",
+          reason: entry.reason
+        });
+      }
+    }
   }
 
   for (const file of staged) {

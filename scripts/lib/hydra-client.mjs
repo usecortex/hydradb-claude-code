@@ -509,6 +509,28 @@ export class HydraClient {
       timeoutMs: this.writeTimeoutMs
     });
   }
+
+  async deleteKnowledge(ids, options = {}) {
+    if (!Array.isArray(ids) || !ids.length) {
+      return {
+        success: true,
+        deleted_count: 0,
+        results: []
+      };
+    }
+
+    return this.request(
+      "/knowledge/delete_knowledge",
+      {
+        tenant_id: this.tenantId,
+        sub_tenant_id: this.subTenantId,
+        ids
+      },
+      {
+        timeoutMs: options.timeoutMs ?? this.writeTimeoutMs
+      }
+    );
+  }
 }
 
 export function combineRecallErrors(results) {

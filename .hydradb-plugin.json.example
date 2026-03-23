@@ -17,8 +17,8 @@
   "writeTimeoutMs": 15000,
   "maxFileSizeBytes": 250000,
   "maxFilesPerSync": 25,
-  "maxMemoryCharsPerChunk": 12000,
-  "maxMemoryChunksPerFile": 8,
+  "maxMemoryCharsPerChunk": 250000,
+  "maxMemoryChunksPerFile": 1,
   "includeGlobs": [
     "CLAUDE.md",
     ".claude/**/*.md",
