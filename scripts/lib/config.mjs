@@ -38,6 +38,8 @@ const DEFAULT_EXCLUDE_GLOBS = [
   "**/*.cer"
 ];
 
+const FIFTY_MB = 50 * 1024 * 1024;
+
 export const DEFAULTS = {
   apiBaseUrl: "https://api.hydradb.com",
   autoRecall: true,
@@ -52,9 +54,9 @@ export const DEFAULTS = {
   maxKnowledgeResults: 4,
   requestTimeoutMs: 15000,
   writeTimeoutMs: 15000,
-  maxFileSizeBytes: 250000,
+  maxFileSizeBytes: FIFTY_MB,
   maxFilesPerSync: 25,
-  maxMemoryCharsPerChunk: 250000,
+  maxMemoryCharsPerChunk: FIFTY_MB,
   maxMemoryChunksPerFile: 1,
   includeGlobs: DEFAULT_INCLUDE_GLOBS,
   excludeGlobs: DEFAULT_EXCLUDE_GLOBS,

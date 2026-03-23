@@ -127,7 +127,8 @@ const status = JSON.parse(statusRaw);
 assert.equal(status.configured, true);
 assert.equal(status.resolvedConfig.subTenantId, "");
 assert.equal(status.resolvedConfig.captureMode, "session-upsert");
-assert.equal(status.resolvedConfig.maxMemoryCharsPerChunk, 250000);
+assert.equal(status.resolvedConfig.maxFileSizeBytes, 50 * 1024 * 1024);
+assert.equal(status.resolvedConfig.maxMemoryCharsPerChunk, 50 * 1024 * 1024);
 assert.equal(status.resolvedConfig.maxMemoryChunksPerFile, 1);
 
 const tempHome = await fs.mkdtemp(path.join(os.tmpdir(), "hydradb-plugin-home-"));

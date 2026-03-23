@@ -186,6 +186,56 @@ function buildMemoryItems(file, projectRoot, config) {
   }));
 }
 
+function memorySourceIds(projectRoot, relPath, chunkCount) {
+  const baseSourceId = fileSourceId(projectRoot, relPath);
+  if (chunkCount <= 1) {
+    return [baseSourceId];
+  }
+
+  return Array.from({ length: chunkCount }, (_, index) => `${baseSourceId}:chunk:${index + 1}`);
+}
+
+function estimateMemoryItemBytes(item) {
+  return Buffer.byteLength(JSON.stringify(item), "utf8");
+}
+
+function batchMemoryItems(items, maxRequestBytes) {
+  if (!items.length) {
+    return [];
+  }
+
+  const batches = [];
+  let current = [];
+  let currentBytes = 256;
+
+  for (const item of items) {
+    const itemBytes = estimateMemoryItemBytes(item) + 2;
+    const batchLimit = Math.max(maxRequestBytes, itemBytes + 1024);
+
+    if (!current.length) {
+      current = [item];
+      currentBytes = 256 + itemBytes;
+      continue;
+    }
+
+    if (currentBytes + itemBytes > batchLimit) {
+      batches.push(current);
+      current = [item];
+      currentBytes = 256 + itemBytes;
+      continue;
+    }
+
+    current.push(item);
+    currentBytes += itemBytes;
+  }
+
+  if (current.length) {
+    batches.push(current);
+  }
+
+  return batches;
+}
+
 function buildKnowledgeItem(file, projectRoot, workspaceName) {
   return {
     id: fileSourceId(projectRoot, file.relPath),
@@ -372,8 +422,8 @@ export async function syncWorkspace({
   const knowledgeFiles = staged.filter((file) => file.target === "knowledge");
 
   const memoryItems = memoryFiles.flatMap((file) => buildMemoryItems(file, projectRoot, config));
-  for (let index = 0; index < memoryItems.length; index += 10) {
-    await client.addMemories(memoryItems.slice(index, index + 10), {
+  for (const batch of batchMemoryItems(memoryItems, config.maxFileSizeBytes)) {
+    await client.addMemories(batch, {
       upsert: true,
       timeoutMs: config.writeTimeoutMs
     });
@@ -387,33 +437,87 @@ export async function syncWorkspace({
   }
 
   if (candidatePaths == null) {
+    const memoryIdsToDelete = new Set();
     const knowledgeIdsToDelete = [];
+    const deletedMemoryPaths = [];
     const deletedKnowledgePaths = [];
 
     for (const [filePath, previous] of Object.entries(state.files || {})) {
-      if (previous?.target !== "knowledge") {
-        continue;
-      }
-
       const wasDeleted = !scannedPaths.has(filePath);
       const ineligible = ineligibleByPath.get(filePath);
       const stagedEntry = stagedByPath.get(filePath);
-      const movedAwayFromKnowledge = stagedEntry && stagedEntry.target !== "knowledge";
+      const nextChunkCount = staged.find((file) => file.filePath === filePath)?.chunkCount ?? 0;
 
-      if (!wasDeleted && !ineligible && !movedAwayFromKnowledge) {
-        continue;
+      if (previous?.target === "memory") {
+        const movedAwayFromMemory = stagedEntry && stagedEntry.target !== "memory";
+        const currentMemoryIds =
+          stagedEntry?.target === "memory"
+            ? new Set(memorySourceIds(projectRoot, previous.relPath, nextChunkCount))
+            : new Set();
+        const previousMemoryIds = memorySourceIds(
+          projectRoot,
+          previous.relPath,
+          previous.chunkCount || 1
+        );
+
+        const shouldDeleteWholeMemory =
+          wasDeleted || ineligible || movedAwayFromMemory;
+
+        const staleMemoryIds = shouldDeleteWholeMemory
+          ? previousMemoryIds
+          : previousMemoryIds.filter((id) => !currentMemoryIds.has(id));
+
+        for (const id of staleMemoryIds) {
+          memoryIdsToDelete.add(id);
+        }
+
+        if (shouldDeleteWholeMemory && staleMemoryIds.length) {
+          deletedMemoryPaths.push({
+            filePath,
+            relPath: previous.relPath,
+            reason: wasDeleted
+              ? "deleted"
+              : movedAwayFromMemory
+                ? "ingestion-target-changed"
+                : ineligible.reason
+          });
+        }
       }
 
-      knowledgeIdsToDelete.push(fileSourceId(projectRoot, previous.relPath));
-      deletedKnowledgePaths.push({
-        filePath,
-        relPath: previous.relPath,
-        reason: wasDeleted
-          ? "deleted"
-          : movedAwayFromKnowledge
-            ? "ingestion-target-changed"
-            : ineligible.reason
+      if (previous?.target === "knowledge") {
+        const movedAwayFromKnowledge = stagedEntry && stagedEntry.target !== "knowledge";
+
+        if (!wasDeleted && !ineligible && !movedAwayFromKnowledge) {
+          continue;
+        }
+
+        knowledgeIdsToDelete.push(fileSourceId(projectRoot, previous.relPath));
+        deletedKnowledgePaths.push({
+          filePath,
+          relPath: previous.relPath,
+          reason: wasDeleted
+            ? "deleted"
+            : movedAwayFromKnowledge
+              ? "ingestion-target-changed"
+              : ineligible.reason
+        });
+      }
+    }
+
+    if (memoryIdsToDelete.size) {
+      await client.deleteMemories([...memoryIdsToDelete], {
+        timeoutMs: config.writeTimeoutMs
       });
+
+      for (const entry of deletedMemoryPaths) {
+        delete state.files[entry.filePath];
+        summary.deleted += 1;
+        summary.deletedFiles.push({
+          path: entry.relPath,
+          target: "memory",
+          reason: entry.reason
+        });
+      }
     }
 
     if (knowledgeIdsToDelete.length) {

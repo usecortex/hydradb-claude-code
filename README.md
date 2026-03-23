@@ -182,15 +182,15 @@ See [config.example.json](./config.example.json) for the full shape and [.hydrad
   "maxKnowledgeResults": 4,
   "requestTimeoutMs": 15000,
   "writeTimeoutMs": 15000,
-  "maxFileSizeBytes": 250000,
+  "maxFileSizeBytes": 52428800,
   "maxFilesPerSync": 25,
-  "maxMemoryCharsPerChunk": 250000,
+  "maxMemoryCharsPerChunk": 52428800,
   "maxMemoryChunksPerFile": 1,
   "ignoreMarker": "hydra-ignore"
 }
 ```
 
-`maxMemoryCharsPerChunk` is a character limit, not a token limit. The default now matches `maxFileSizeBytes`, so normal markdown files are synced as one stable memory source instead of being pre-chunked on the client.
+`maxMemoryCharsPerChunk` is a character limit, not a token limit. The default now matches `maxFileSizeBytes` at 50 MB, so normal markdown files are synced as one stable memory source instead of being pre-chunked on the client.
 
 ## Security defaults
 

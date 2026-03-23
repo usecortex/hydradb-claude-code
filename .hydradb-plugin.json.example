@@ -15,9 +15,9 @@
   "maxKnowledgeResults": 4,
   "requestTimeoutMs": 15000,
   "writeTimeoutMs": 15000,
-  "maxFileSizeBytes": 250000,
+  "maxFileSizeBytes": 52428800,
   "maxFilesPerSync": 25,
-  "maxMemoryCharsPerChunk": 250000,
+  "maxMemoryCharsPerChunk": 52428800,
   "maxMemoryChunksPerFile": 1,
   "includeGlobs": [
     "CLAUDE.md",

@@ -26,15 +26,14 @@ This document summarizes the current safeguards in the HydraDB Claude Code plugi
 
 ### Remote purge gap
 
-The plugin now cleans up deleted or newly excluded sources during full workspace syncs when they were synced as knowledge. Memory-mode sync still has one remaining gap because the public memory delete API deletes by `memory_id`, while this plugin only tracks stable `source_id` values.
+The plugin now cleans up deleted or newly excluded sources during full workspace syncs when they were synced as knowledge. It also deletes memory-mode workspace sources during full syncs using the same stable source ids that are used during upsert.
 
 This means stale content can still remain in HydraDB when:
 
-- a previously synced memory source is deleted locally
-- a memory-synced file is later excluded
 - a user lowers `maxMemoryCharsPerChunk` enough to reintroduce client-side `:chunk:n` memory tails and then a file shrinks
+- a partial sync is run against only a touched-file subset, since remote cleanup only runs on full workspace reconciliation
 
-The default config now avoids client-side memory chunking for normal markdown files, which removes the common stale-tail case for memory sync.
+The default config now avoids client-side memory chunking for normal markdown files by allowing up to 50 MB per synced file, which removes the common stale-tail case for memory sync.
 
 ### Hook overlap is reduced, not eliminated
 

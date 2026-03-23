@@ -510,6 +510,62 @@ export class HydraClient {
     });
   }
 
+  async deleteMemory(memoryId, options = {}) {
+    if (!memoryId) {
+      return {
+        success: true,
+        user_memory_deleted: false
+      };
+    }
+
+    const params = new URLSearchParams();
+    params.set("tenant_id", this.tenantId);
+    params.set("memory_id", memoryId);
+    if (this.subTenantId != null) {
+      params.set("sub_tenant_id", this.subTenantId);
+    }
+
+    const timeoutMs = options.timeoutMs ?? this.writeTimeoutMs;
+    let response;
+
+    try {
+      response = await fetch(`${this.baseUrl}/memories/delete_memory?${params.toString()}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          accept: "application/json"
+        },
+        signal: AbortSignal.timeout(timeoutMs)
+      });
+    } catch (error) {
+      if (error?.name === "TimeoutError" || error?.name === "AbortError") {
+        throw new Error(`/memories/delete_memory timed out after ${timeoutMs}ms`);
+      }
+      throw error;
+    }
+
+    if (!response.ok) {
+      const text = trimText(await response.text().catch(() => ""));
+      throw new Error(
+        `/memories/delete_memory failed with ${response.status}${text ? `: ${text}` : ""}`
+      );
+    }
+
+    if (response.status === 204) {
+      return {};
+    }
+
+    return response.json();
+  }
+
+  async deleteMemories(memoryIds, options = {}) {
+    const results = [];
+    for (const memoryId of memoryIds) {
+      results.push(await this.deleteMemory(memoryId, options));
+    }
+    return results;
+  }
+
   async deleteKnowledge(ids, options = {}) {
     if (!Array.isArray(ids) || !ids.length) {
       return {
