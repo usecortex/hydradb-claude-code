@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 
+import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
+
+import { normalizeRetrievalResponse } from "./lib/hydra-client.mjs";
 
 const root = process.cwd();
 
@@ -34,6 +37,20 @@ for (const relativePath of jsonFiles) {
   JSON.parse(raw);
 }
 
+const normalizedRecall = normalizeRetrievalResponse({
+  chunks: [
+    {
+      chunk_uuid: "chunk-1",
+      chunk_content: "HydraDB plugin overview",
+      source_title: "README.md"
+    }
+  ]
+});
+
+assert.equal(normalizedRecall.chunks.length, 1);
+assert.equal(normalizedRecall.chunks[0].text, "HydraDB plugin overview");
+assert.equal(normalizedRecall.chunks[0].sourceTitle, "README.md");
+
 process.stdout.write(
-  `Validated ${scriptFiles.length} core scripts and ${jsonFiles.length} JSON files.\n`
+  `Validated ${scriptFiles.length} core scripts, ${jsonFiles.length} JSON files, and recall normalization.\n`
 );

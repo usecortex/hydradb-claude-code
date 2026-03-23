@@ -31,6 +31,10 @@ function extractChunkText(chunk) {
     return "";
   }
 
+  if (typeof chunk.chunk_content === "string") {
+    return chunk.chunk_content;
+  }
+
   if (typeof chunk.text === "string") {
     return chunk.text;
   }
@@ -308,7 +312,7 @@ function extractDetailedQueryPaths(response) {
   return paths.map((entry) => sanitizePath(entry)).filter(Boolean).slice(0, 4);
 }
 
-function normalizeResponse(response) {
+export function normalizeRetrievalResponse(response) {
   const rawChunks = response?.chunks || response?.results || response?.context || [];
   const chunks = Array.isArray(rawChunks)
     ? rawChunks
@@ -417,7 +421,7 @@ export class HydraClient {
       graph_context: options.graphContext ?? true
     };
 
-    return normalizeResponse(
+    return normalizeRetrievalResponse(
       await this.request("/recall/recall_preferences", payload, {
         timeoutMs: options.timeoutMs ?? this.requestTimeoutMs
       })
@@ -436,7 +440,7 @@ export class HydraClient {
       graph_context: options.graphContext ?? true
     };
 
-    return normalizeResponse(
+    return normalizeRetrievalResponse(
       await this.request("/recall/full_recall", payload, {
         timeoutMs: options.timeoutMs ?? this.requestTimeoutMs
       })
