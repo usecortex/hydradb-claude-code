@@ -43,8 +43,21 @@ async function inferInlinePluginDataDir() {
       return "";
     }
 
-    const dataDir = path.join(os.homedir(), ".claude", "plugins", "data", `${pluginName}-inline`);
-    return (await pathExists(dataDir)) ? dataDir : "";
+    const baseDataDir = path.join(os.homedir(), ".claude", "plugins", "data");
+    // Try canonical inline name first
+    const inlineDir = path.join(baseDataDir, `${pluginName}-inline`);
+    if (await pathExists(inlineDir)) return inlineDir;
+    // Fall back to marketplace folder naming: {pluginName}-{folderBaseName}
+    const folderName = path.basename(pluginRoot);
+    const marketplaceDir = path.join(baseDataDir, `${pluginName}-${folderName}`);
+    if (await pathExists(marketplaceDir)) return marketplaceDir;
+    // Scan for any existing dir that starts with {pluginName}-
+    try {
+      const entries = await fs.readdir(baseDataDir);
+      const match = entries.find(e => e.startsWith(`${pluginName}-`));
+      if (match) return path.join(baseDataDir, match);
+    } catch { /* ignore */ }
+    return "";
   } catch {
     return "";
   }
