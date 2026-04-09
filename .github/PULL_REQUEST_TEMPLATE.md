@@ -22,4 +22,3 @@ Closes #
 - [ ] I have added/updated tests where applicable
 - [ ] `npm install` and `npm run check` still work
 - [ ] I have not committed any secrets or credentials
-- [ ] My code passes type checking (`npm run check`)
