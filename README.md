@@ -233,7 +233,7 @@ Add `hydra-ignore` (or your custom `ignoreMarker`) to:
 ├── .hydradb-plugin.json.example  # Workspace config template
 ├── Makefile               # Build and development targets
 ├── package.json
-├── LICENSE                # MIT
+├── LICENSE                # Apache 2.0
 └── README.md
 ```
 
@@ -266,4 +266,4 @@ Please keep changes focused and include relevant context in your PR description.
 
 ## License
 
-[MIT](LICENSE) — Copyright (c) 2026 HydraDB
+[Apache 2.0](LICENSE) — Copyright (c) 2026 HydraDB
