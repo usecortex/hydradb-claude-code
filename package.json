@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "Secure HydraDB automation for Claude Code with workspace sync, prompt recall, and conversation capture.",
   "author": "HydraDB <support@hydradb.com>",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "homepage": "https://docs.hydradb.com/",
   "repository": {
     "type": "git",
